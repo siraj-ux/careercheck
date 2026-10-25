@@ -72,6 +72,39 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
+## Phase 2: Public Site & Test Engine
+
+### Implemented Features
+- **Marketing Landing Page** (`/`):
+  - Responsive hero with dual CTAs (**Take the free test** & **Talk to a consultant**).
+  - Configurable trust bar (5,000+ students, 80+ consultants, 4.8/5 rating).
+  - 4-step "How it works" stepper (Take test → Get matched → Meet consultant → Follow roadmap).
+  - Audience cards for Undergraduate (UG) and Postgraduate (PG) tracks.
+  - Interactive sample report preview with a **"View as Table"** toggle.
+  - Testimonials carousel, pricing comparison teaser, and 6-question FAQ accordion.
+  - **"For Parents"** credibility strip highlighting verified credentials, transparent pricing, and zero kickbacks.
+  - Complete SEO metadata, OpenGraph, and semantic HTML hierarchy.
+
+- **5-Step Profile Intake** (`/onboarding/profile`):
+  - Step 1: Level Selection (UG / PG) with "what you'll get" breakdown.
+  - Step 2: Marks & Stream (UG board/stream/% or PG degree/specialisation).
+  - Step 3: Aspirations & Preferred Cities (interest chips, city tags, relocate toggle).
+  - Step 4: Budget & Knowledge (budget bands, fine-tune slider, loan toggle, rating 1-5).
+  - Step 5: Review & Confirm with per-step edit links.
+  - Real-time autosave with discreet `"Saved ✓"` feedback.
+  - Desktop **"Why We Ask"** side panel providing transparency and reassurance.
+
+- **Test Intro & Engine** (`/test/intro`, `/test/[sessionId]`, `/test/section-break`):
+  - **Question Types**: Likert 1–5 scale (Interests, Personality, Values) and MCQ A–D (Aptitude & PG Domain).
+  - **Timed Sections**: Aptitude (12 min) and PG Domain (10 min) run with server-enforced countdown timers. On expiry, sections are automatically submitted, unanswered questions count as skipped, and the test smoothly advances to the section break.
+  - **Autosave & Resume**: Each answer is recorded in a fast transaction. Students can close the browser mid-test and resume at the exact question.
+  - **Offline Queue**: Answers entered offline are cached locally and batched via `/api/test/sync` in a single transaction when reconnected.
+  - **Desktop Keyboard Shortcuts**: Keys `1`–`5` for Likert ratings, `A`–`D` for multiple choice options, and `Enter ↵` for advancing.
+  - **Section Break**: Celebration-first screens with overall test progress, next-section previews, and a pause option.
+  - **Zero Key Leak Security**: Server strictly sanitizes question payloads; `correctKey` and internal scoring metrics are never sent to the client.
+
+---
+
 ## Database Rules & Pragmas
 
 Every connection automatically runs:

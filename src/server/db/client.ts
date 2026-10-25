@@ -13,7 +13,7 @@ if (!fs.existsSync(dir)) {
 }
 
 export function createSqliteConnection(targetPath: string = dbPath) {
-  const sqlite = new Database(targetPath);
+  const sqlite = new Database(targetPath, { timeout: 10000 });
   
   // Enforce mandatory PRAGMAs per database rules
   sqlite.pragma('journal_mode = WAL');
