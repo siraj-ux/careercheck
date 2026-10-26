@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, use, Suspense } from 'react';
 import Link from 'next/link';
 import {
   Compass,
@@ -20,9 +20,7 @@ interface SharePageProps {
   params: Promise<{ token: string }>;
 }
 
-export default function SharedReportPage({ params }: SharePageProps) {
-  const resolvedParams = use(params);
-  const token = resolvedParams.token;
+function SharedReportContent({ token }: { token: string }) {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -166,5 +164,27 @@ export default function SharedReportPage({ params }: SharePageProps) {
         )}
       </main>
     </div>
+  );
+}
+
+function SharedReportParamsWrapper({ params }: SharePageProps) {
+  const resolvedParams = use(params);
+  return <SharedReportContent token={resolvedParams.token} />;
+}
+
+export default function SharedReportPage({ params }: SharePageProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-zinc-50">
+          <div className="text-center space-y-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent mx-auto" />
+            <div className="text-sm font-medium text-zinc-600">Loading shared report...</div>
+          </div>
+        </div>
+      }
+    >
+      <SharedReportParamsWrapper params={params} />
+    </Suspense>
   );
 }

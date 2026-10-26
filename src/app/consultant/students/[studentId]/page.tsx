@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -116,7 +116,7 @@ interface Student360Data {
   } | null;
 }
 
-export default function Student360Page() {
+function Student360Content() {
   const router = useRouter();
   const params = useParams();
   const studentId = params?.studentId as string;
@@ -977,5 +977,24 @@ export default function Student360Page() {
         onClose={() => setChatOpen(false)}
       />
     </div>
+  );
+}
+
+function Student360Skeleton() {
+  return (
+    <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-6">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+        <span className="text-sm font-medium text-zinc-600">Loading student 360 diagnostic...</span>
+      </div>
+    </div>
+  );
+}
+
+export default function Student360Page() {
+  return (
+    <Suspense fallback={<Student360Skeleton />}>
+      <Student360Content />
+    </Suspense>
   );
 }
