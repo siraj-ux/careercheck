@@ -370,6 +370,11 @@ export class ConsultantService {
         },
       },
       session: nextSession || null,
+      consultant: {
+        id: consultant.id,
+        userId: consultant.userId,
+        title: consultant.title,
+      },
     };
   }
 

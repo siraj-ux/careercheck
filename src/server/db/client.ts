@@ -27,16 +27,16 @@ export const pool =
   new Pool({
     connectionString,
     ssl: { rejectUnauthorized: false },
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    max: 10,
+    idleTimeoutMillis: 5000, // Reclaim idle clients after 5s before Neon PgBouncer terminates them
+    connectionTimeoutMillis: 30000, // 30s gives Neon serverless compute ample time to wake up from cold start
     keepAlive: true,
-    keepAliveInitialDelayMillis: 10000,
+    keepAliveInitialDelayMillis: 5000,
   });
 
 pool.on('error', (err) => {
   // Catch background idle timeouts so they don't crash the process
-  console.warn('PostgreSQL idle client event:', err.message);
+  console.warn('[DB Pool] Idle client event:', err.message);
 });
 
 if (process.env.NODE_ENV !== 'production') {

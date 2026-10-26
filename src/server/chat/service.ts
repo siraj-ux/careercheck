@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { eq, and, desc, asc } from 'drizzle-orm';
+import { eq, and, or, desc, asc } from 'drizzle-orm';
 import { db } from '@/server/db/client';
 import { users } from '@/server/db/schema/users';
 import { consultants, sessions } from '@/server/db/schema/consultants';
@@ -8,13 +8,50 @@ import { NotificationService } from '@/server/notifications/service';
 
 export class ChatService {
   /**
+   * Resolves consultant record from either consultant id, consultant user id, or session id.
+   */
+  static async resolveConsultant(identifier: string) {
+    if (!identifier) return null;
+
+    // 1. Direct match on consultants table (by id or userId)
+    const [byConsultant] = await db
+      .select()
+      .from(consultants)
+      .where(or(eq(consultants.id, identifier), eq(consultants.userId, identifier)))
+      .limit(1);
+
+    if (byConsultant) return byConsultant;
+
+    // 2. Fallback check: if identifier was accidentally passed as a session ID
+    const [bySession] = await db
+      .select({ consultantId: sessions.consultantId })
+      .from(sessions)
+      .where(eq(sessions.id, identifier))
+      .limit(1);
+
+    if (bySession) {
+      const [c] = await db
+        .select()
+        .from(consultants)
+        .where(eq(consultants.id, bySession.consultantId))
+        .limit(1);
+      if (c) return c;
+    }
+
+    return null;
+  }
+
+  /**
    * Validates if chat window is active (booking until 30 days after session).
    */
   static async isChatActive(studentId: string, consultantId: string): Promise<boolean> {
+    const consultant = await this.resolveConsultant(consultantId);
+    const resolvedConsultantId = consultant ? consultant.id : consultantId;
+
     const [latestSession] = await db
       .select({ scheduledAt: sessions.scheduledAt, status: sessions.status })
       .from(sessions)
-      .where(and(eq(sessions.studentId, studentId), eq(sessions.consultantId, consultantId)))
+      .where(and(eq(sessions.studentId, studentId), eq(sessions.consultantId, resolvedConsultantId)))
       .orderBy(desc(sessions.scheduledAt))
       .limit(1);
 
@@ -36,7 +73,7 @@ export class ChatService {
    * Automatically marks unread incoming messages as read.
    */
   static async getThread(currentUserId: string, studentId: string, consultantId: string) {
-    const [consultant] = await db.select().from(consultants).where(eq(consultants.id, consultantId)).limit(1);
+    const consultant = await this.resolveConsultant(consultantId);
     if (!consultant) throw new Error('Consultant not found');
 
     const isStudent = currentUserId === studentId;
@@ -58,7 +95,7 @@ export class ChatService {
         createdAt: messages.createdAt,
       })
       .from(messages)
-      .where(and(eq(messages.studentId, studentId), eq(messages.consultantId, consultantId)))
+      .where(and(eq(messages.studentId, studentId), eq(messages.consultantId, consultant.id)))
       .orderBy(asc(messages.createdAt));
 
     // Mark unread messages sent by the other party as read
@@ -75,7 +112,7 @@ export class ChatService {
     const [studentUser] = await db.select({ name: users.name }).from(users).where(eq(users.id, studentId)).limit(1);
     const [consultantUser] = await db.select({ name: users.name }).from(users).where(eq(users.id, consultant.userId)).limit(1);
 
-    const isActive = await this.isChatActive(studentId, consultantId);
+    const isActive = await this.isChatActive(studentId, consultant.id);
 
     return {
       messages: thread,
@@ -98,7 +135,7 @@ export class ChatService {
       throw new Error('Message body cannot be empty.');
     }
 
-    const [consultant] = await db.select().from(consultants).where(eq(consultants.id, consultantId)).limit(1);
+    const consultant = await this.resolveConsultant(consultantId);
     if (!consultant) throw new Error('Consultant not found');
 
     const isStudent = senderUserId === studentId;
@@ -108,7 +145,7 @@ export class ChatService {
       throw new Error('Unauthorized to send messages in this thread.');
     }
 
-    const isChatActive = await this.isChatActive(studentId, consultantId);
+    const isChatActive = await this.isChatActive(studentId, consultant.id);
     if (!isChatActive) {
       throw new Error('Chat access has expired (limited to 30 days following consultation).');
     }
@@ -120,7 +157,7 @@ export class ChatService {
       .values({
         id,
         studentId,
-        consultantId,
+        consultantId: consultant.id,
         senderId: senderUserId,
         body: body.trim(),
         readAt: null,
@@ -136,7 +173,7 @@ export class ChatService {
       type: 'chat_message',
       title: `Message from ${senderName}`,
       body: body.length > 80 ? `${body.slice(0, 80)}...` : body,
-      payloadJson: { messageId: id, studentId, consultantId },
+      payloadJson: { messageId: id, studentId, consultantId: consultant.id },
     });
 
     return {

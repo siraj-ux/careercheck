@@ -109,11 +109,17 @@ interface Student360Data {
   };
   session: {
     id: string;
+    consultantId?: string;
     scheduledAt: string;
     durationMinutes: number;
     status: string;
     joinLink: string | null;
   } | null;
+  consultant?: {
+    id: string;
+    userId: string;
+    title: string;
+  };
 }
 
 function Student360Content() {
@@ -969,9 +975,9 @@ function Student360Content() {
 
       {/* Chat Drawer */}
       <ChatDrawer
-        currentUserId={student.id} // Consultant user is acting
+        currentUserId={data.consultant?.userId || ''}
         studentId={student.id}
-        consultantId={data.session?.id || ''}
+        consultantId={data.consultant?.id || data.session?.consultantId || ''}
         recipientName={student.name}
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}

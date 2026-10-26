@@ -36,7 +36,7 @@ export function ChatDrawer({
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !studentId || !consultantId) return;
     let isCancelled = false;
 
     async function loadMessages() {
@@ -46,6 +46,7 @@ export function ChatDrawer({
           const data = await res.json();
           if (data.success) {
             setMessages(data.messages || []);
+            setError(null);
           }
         }
       } catch {
@@ -76,7 +77,7 @@ export function ChatDrawer({
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || sending) return;
+    if (!inputText.trim() || sending || !studentId || !consultantId) return;
 
     setSending(true);
     setError(null);
@@ -97,6 +98,7 @@ export function ChatDrawer({
       const data = await res.json();
       if (data.success && data.message) {
         setMessages((prev) => [...prev, data.message]);
+        setError(null);
       } else {
         setError(data.error || 'Failed to send message');
         setInputText(bodyToSend);
@@ -151,7 +153,9 @@ export function ChatDrawer({
               <MessageSquare className="h-8 w-8 mx-auto text-zinc-300" />
               <p className="text-xs font-medium text-zinc-600">No messages exchanged yet.</p>
               <p className="text-[11px] text-zinc-400 max-w-xs mx-auto">
-                Ask your mentor any questions regarding your roadmap, colleges, or career options.
+                {currentUserId === studentId
+                  ? 'Ask your mentor any questions regarding your roadmap, colleges, or career options.'
+                  : 'Send guidance, updates, or follow-ups to your student.'}
               </p>
             </div>
           ) : (
