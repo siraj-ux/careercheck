@@ -1,8 +1,8 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { results } from './tests';
 
-export const careerMatches = sqliteTable(
+export const careerMatches = pgTable(
   'career_matches',
   {
     id: text('id').primaryKey(),

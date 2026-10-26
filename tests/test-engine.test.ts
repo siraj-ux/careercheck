@@ -28,7 +28,7 @@ describe('Test Engine Core Functionality', () => {
     // Create a dedicated test user
     testUserId = crypto.randomUUID();
     const now = new Date().toISOString();
-    db.insert(users)
+    await db.insert(users)
       .values({
         id: testUserId,
         phone: `+9199999${crypto.randomInt(10000, 99999)}`,
@@ -37,18 +37,16 @@ describe('Test Engine Core Functionality', () => {
         level: 'UG',
         createdAt: now,
         updatedAt: now,
-      })
-      .run();
+      });
 
-    db.insert(studentProfiles)
+    await db.insert(studentProfiles)
       .values({
         id: crypto.randomUUID(),
         userId: testUserId,
         createdAt: now,
         updatedAt: now,
-      })
-      .run();
-  });
+      });
+  }, 60000);
 
   it('1. Autosave: Records single answer in short transaction and updates session state', async () => {
     const session = await getOrCreateTestSession(testUserId, 'UG');
@@ -71,11 +69,11 @@ describe('Test Engine Core Functionality', () => {
     expect(result.success).toBe(true);
 
     // Verify response in DB
-    const saved = db
+    const [saved] = await db
       .select()
       .from(responses)
       .where(and(eq(responses.sessionId, session.id), eq(responses.questionId, targetQ.id)))
-      .get();
+      .limit(1);
 
     expect(saved).toBeDefined();
     expect(saved?.answer).toBe('4');
@@ -91,11 +89,11 @@ describe('Test Engine Core Functionality', () => {
     });
     expect(updated.success).toBe(true);
 
-    const reSaved = db
+    const [reSaved] = await db
       .select()
       .from(responses)
       .where(and(eq(responses.sessionId, session.id), eq(responses.questionId, targetQ.id)))
-      .get();
+      .limit(1);
     expect(reSaved?.answer).toBe('5');
   });
 
@@ -138,10 +136,9 @@ describe('Test Engine Core Functionality', () => {
 
     // Artificially expire the section by setting deadline in the past
     const pastTime = new Date(Date.now() - 60000).toISOString(); // 1 minute ago
-    db.update(testSectionProgress)
+    await db.update(testSectionProgress)
       .set({ deadline: pastTime, submittedAt: null })
-      .where(eq(testSectionProgress.id, progress.id))
-      .run();
+      .where(eq(testSectionProgress.id, progress.id));
 
     // Check progress again
     const expiredCheck = await getOrStartSectionProgress(session.id, 'aptitude');
@@ -181,16 +178,16 @@ describe('Test Engine Core Functionality', () => {
     expect(syncResult.count).toBe(2);
 
     // Verify both are present in database
-    const ans1 = db
+    const [ans1] = await db
       .select()
       .from(responses)
       .where(and(eq(responses.sessionId, session.id), eq(responses.questionId, aptitudeQuestions[1].id)))
-      .get();
-    const ans2 = db
+      .limit(1);
+    const [ans2] = await db
       .select()
       .from(responses)
       .where(and(eq(responses.sessionId, session.id), eq(responses.questionId, aptitudeQuestions[2].id)))
-      .get();
+      .limit(1);
 
     expect(ans1?.answer).toBe('B');
     expect(ans2?.answer).toBe('C');

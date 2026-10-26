@@ -45,30 +45,31 @@ function seededShuffle<T>(array: T[], seed: string): T[] {
  * Finds or initializes an active test session for the user.
  */
 export async function getOrCreateTestSession(userId: string, level: 'UG' | 'PG' = 'UG') {
-  let session = db
+  const [sessionFound] = await db
     .select()
     .from(testSessions)
     .where(and(eq(testSessions.userId, userId), inArray(testSessions.status, ['not_started', 'in_progress'])))
-    .get();
+    .limit(1);
+
+  let session = sessionFound;
 
   if (!session) {
     const now = new Date().toISOString();
     const newId = crypto.randomUUID();
 
-    db.insert(testSessions)
-      .values({
-        id: newId,
-        userId,
-        level,
-        status: 'in_progress',
-        currentSection: 'interests',
-        currentQuestionIndex: 0,
-        startedAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(testSessions).values({
+      id: newId,
+      userId,
+      level,
+      status: 'in_progress',
+      currentSection: 'interests',
+      currentQuestionIndex: 0,
+      startedAt: now,
+      updatedAt: now,
+    });
 
-    session = db.select().from(testSessions).where(eq(testSessions.id, newId)).get()!;
+    const [created] = await db.select().from(testSessions).where(eq(testSessions.id, newId)).limit(1);
+    session = created!;
   }
 
   return session;
@@ -85,12 +86,13 @@ export function getSectionsForLevel(level: 'UG' | 'PG'): readonly SectionType[] 
  * Gets or starts progress for a specific section, enforcing server-side timer if timed.
  */
 export async function getOrStartSectionProgress(sessionId: string, section: SectionType) {
-  let progress = db
+  const [foundProgress] = await db
     .select()
     .from(testSectionProgress)
     .where(and(eq(testSectionProgress.sessionId, sessionId), eq(testSectionProgress.section, section)))
-    .get();
+    .limit(1);
 
+  let progress = foundProgress;
   const now = new Date();
   const meta = SECTION_META[section];
 
@@ -101,22 +103,21 @@ export async function getOrStartSectionProgress(sessionId: string, section: Sect
       : null;
 
     const progressId = crypto.randomUUID();
-    db.insert(testSectionProgress)
-      .values({
-        id: progressId,
-        sessionId,
-        section,
-        startedAt,
-        deadline,
-        submittedAt: null,
-      })
-      .run();
+    await db.insert(testSectionProgress).values({
+      id: progressId,
+      sessionId,
+      section,
+      startedAt,
+      deadline,
+      submittedAt: null,
+    });
 
-    progress = db
+    const [created] = await db
       .select()
       .from(testSectionProgress)
       .where(eq(testSectionProgress.id, progressId))
-      .get()!;
+      .limit(1);
+    progress = created!;
   }
 
   // Check if expired
@@ -131,13 +132,12 @@ export async function getOrStartSectionProgress(sessionId: string, section: Sect
     if (diff <= 0 && !progress.submittedAt) {
       isExpired = true;
       // Auto-submit expired section
-      db.update(testSectionProgress)
+      await db.update(testSectionProgress)
         .set({
           submittedAt: progress.deadline,
           timeTakenSeconds: meta.durationMin * 60,
         })
-        .where(eq(testSectionProgress.id, progress.id))
-        .run();
+        .where(eq(testSectionProgress.id, progress.id));
 
       progress = {
         ...progress,
@@ -164,11 +164,10 @@ export async function getSanitizedQuestionsForSection(
   section: SectionType,
   level: 'UG' | 'PG'
 ): Promise<ClientQuestion[]> {
-  const rawQuestions = db
+  const rawQuestions = await db
     .select()
     .from(questions)
-    .where(and(eq(questions.section, section), eq(questions.status, 'live')))
-    .all();
+    .where(and(eq(questions.section, section), eq(questions.status, 'live')));
 
   // Filter level (UG, PG, or both)
   const filtered = rawQuestions.filter((q) => q.level === 'both' || q.level === level);
@@ -183,11 +182,11 @@ export async function getSanitizedQuestionsForSection(
  * Loads the complete resume state for a test session.
  */
 export async function getTestSessionState(sessionId: string, userId: string) {
-  const session = db
+  const [session] = await db
     .select()
     .from(testSessions)
     .where(and(eq(testSessions.id, sessionId), eq(testSessions.userId, userId)))
-    .get();
+    .limit(1);
 
   if (!session) return null;
 
@@ -202,14 +201,13 @@ export async function getTestSessionState(sessionId: string, userId: string) {
   );
 
   // Fetch answered responses for this session & section
-  const answered = db
+  const answered = await db
     .select({
       questionId: responses.questionId,
       answer: responses.answer,
     })
     .from(responses)
-    .where(eq(responses.sessionId, sessionId))
-    .all();
+    .where(eq(responses.sessionId, sessionId));
 
   const answeredMap = new Map(answered.map((a) => [a.questionId, a.answer]));
 
@@ -274,11 +272,11 @@ export async function recordAnswer(params: {
   const { sessionId, userId, questionId, answer, timeTakenSeconds } = params;
 
   // Validate session ownership
-  const session = db
+  const [session] = await db
     .select()
     .from(testSessions)
     .where(and(eq(testSessions.id, sessionId), eq(testSessions.userId, userId)))
-    .get();
+    .limit(1);
 
   if (!session) {
     throw new Error('Test session not found or unauthorized');
@@ -299,24 +297,23 @@ export async function recordAnswer(params: {
   const now = new Date().toISOString();
 
   // Execute in short transaction
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     // Check if response already exists
-    const existing = tx
+    const [existing] = await tx
       .select({ id: responses.id })
       .from(responses)
       .where(and(eq(responses.sessionId, sessionId), eq(responses.questionId, questionId)))
-      .get();
+      .limit(1);
 
     if (existing) {
-      tx.update(responses)
+      await tx.update(responses)
         .set({
           answer,
           timeTakenSeconds: timeTakenSeconds ?? 0,
         })
-        .where(eq(responses.id, existing.id))
-        .run();
+        .where(eq(responses.id, existing.id));
     } else {
-      tx.insert(responses)
+      await tx.insert(responses)
         .values({
           id: crypto.randomUUID(),
           sessionId,
@@ -324,16 +321,14 @@ export async function recordAnswer(params: {
           answer,
           timeTakenSeconds: timeTakenSeconds ?? 0,
           createdAt: now,
-        })
-        .run();
+        });
     }
 
-    tx.update(testSessions)
+    await tx.update(testSessions)
       .set({
         updatedAt: now,
       })
-      .where(eq(testSessions.id, sessionId))
-      .run();
+      .where(eq(testSessions.id, sessionId));
   });
 
   return { success: true, savedAt: now };
@@ -350,11 +345,11 @@ export async function syncOfflineAnswers(params: {
 }) {
   const { sessionId, userId, answers } = params;
 
-  const session = db
+  const [session] = await db
     .select()
     .from(testSessions)
     .where(and(eq(testSessions.id, sessionId), eq(testSessions.userId, userId)))
-    .get();
+    .limit(1);
 
   if (!session) {
     throw new Error('Session not found or unauthorized');
@@ -362,24 +357,23 @@ export async function syncOfflineAnswers(params: {
 
   const now = new Date().toISOString();
 
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     for (const item of answers) {
-      const existing = tx
+      const [existing] = await tx
         .select({ id: responses.id })
         .from(responses)
         .where(and(eq(responses.sessionId, sessionId), eq(responses.questionId, item.questionId)))
-        .get();
+        .limit(1);
 
       if (existing) {
-        tx.update(responses)
+        await tx.update(responses)
           .set({
             answer: item.answer,
             timeTakenSeconds: item.timeTakenSeconds ?? 0,
           })
-          .where(eq(responses.id, existing.id))
-          .run();
+          .where(eq(responses.id, existing.id));
       } else {
-        tx.insert(responses)
+        await tx.insert(responses)
           .values({
             id: crypto.randomUUID(),
             sessionId,
@@ -387,15 +381,13 @@ export async function syncOfflineAnswers(params: {
             answer: item.answer,
             timeTakenSeconds: item.timeTakenSeconds ?? 0,
             createdAt: now,
-          })
-          .run();
+          });
       }
     }
 
-    tx.update(testSessions)
+    await tx.update(testSessions)
       .set({ updatedAt: now })
-      .where(eq(testSessions.id, sessionId))
-      .run();
+      .where(eq(testSessions.id, sessionId));
   });
 
   return { success: true, count: answers.length };
@@ -405,11 +397,11 @@ export async function syncOfflineAnswers(params: {
  * Submits the current section and advances the session to the next section or section break.
  */
 export async function submitSection(sessionId: string, userId: string, section: SectionType) {
-  const session = db
+  const [session] = await db
     .select()
     .from(testSessions)
     .where(and(eq(testSessions.id, sessionId), eq(testSessions.userId, userId)))
-    .get();
+    .limit(1);
 
   if (!session) {
     throw new Error('Session not found');
@@ -420,26 +412,24 @@ export async function submitSection(sessionId: string, userId: string, section: 
   const now = new Date().toISOString();
 
   // Mark section progress as submitted
-  db.update(testSectionProgress)
+  await db.update(testSectionProgress)
     .set({
       submittedAt: now,
     })
-    .where(and(eq(testSectionProgress.sessionId, sessionId), eq(testSectionProgress.section, section)))
-    .run();
+    .where(and(eq(testSectionProgress.sessionId, sessionId), eq(testSectionProgress.section, section)));
 
   const nextIdx = currentIdx + 1;
   const isLastSection = nextIdx >= sections.length;
 
   if (isLastSection) {
     // Complete the entire test session
-    db.update(testSessions)
+    await db.update(testSessions)
       .set({
         status: 'completed',
         completedAt: now,
         updatedAt: now,
       })
-      .where(eq(testSessions.id, sessionId))
-      .run();
+      .where(eq(testSessions.id, sessionId));
 
     // Dynamically calculate and persist assessment results
     try {
@@ -458,14 +448,13 @@ export async function submitSection(sessionId: string, userId: string, section: 
 
   const nextSection = sections[nextIdx];
 
-  db.update(testSessions)
+  await db.update(testSessions)
     .set({
       currentSection: nextSection,
       currentQuestionIndex: 0,
       updatedAt: now,
     })
-    .where(eq(testSessions.id, sessionId))
-    .run();
+    .where(eq(testSessions.id, sessionId));
 
   return {
     completed: false,

@@ -23,18 +23,18 @@ import { SpectrumKey, RiasecLetter, AptitudeSubType } from '@/config/scoring';
  */
 export async function calculateAndStoreSessionResults(sessionId: string, userId: string) {
   // 1. Verify session exists and belongs to user
-  const session = db
+  const [session] = await db
     .select()
     .from(testSessions)
     .where(and(eq(testSessions.id, sessionId), eq(testSessions.userId, userId)))
-    .get();
+    .limit(1);
 
   if (!session) {
     throw new Error('Test session not found or unauthorized');
   }
 
   // 2. Fetch all student responses for this session with question metadata
-  const userResponses = db
+  const userResponses = await db
     .select({
       responseId: responses.id,
       questionId: responses.questionId,
@@ -50,8 +50,7 @@ export async function calculateAndStoreSessionResults(sessionId: string, userId:
     })
     .from(responses)
     .innerJoin(questions, eq(responses.questionId, questions.id))
-    .where(eq(responses.sessionId, sessionId))
-    .all();
+    .where(eq(responses.sessionId, sessionId));
 
   // 3. Prepare items for each scoring engine
   const riasecItems: RiasecInputItem[] = [];
@@ -105,17 +104,17 @@ export async function calculateAndStoreSessionResults(sessionId: string, userId:
   let resultId: string;
 
   // 6. Save in atomic transaction
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     // Check if result record already exists
-    const existing = tx
+    const [existing] = await tx
       .select({ id: results.id })
       .from(results)
       .where(eq(results.sessionId, sessionId))
-      .get();
+      .limit(1);
 
     if (existing) {
       resultId = existing.id;
-      tx.update(results)
+      await tx.update(results)
         .set({
           riasecCode: riasec.code,
           radarScoresJson: JSON.stringify(riasec.scores),
@@ -123,14 +122,13 @@ export async function calculateAndStoreSessionResults(sessionId: string, userId:
           personalitySpectrumsJson: JSON.stringify(personality),
           topValuesJson: JSON.stringify(values.topValues),
         })
-        .where(eq(results.id, resultId))
-        .run();
+        .where(eq(results.id, resultId));
 
       // Clear existing career matches for regeneration
-      tx.delete(careerMatches).where(eq(careerMatches.resultId, resultId)).run();
+      await tx.delete(careerMatches).where(eq(careerMatches.resultId, resultId));
     } else {
       resultId = crypto.randomUUID();
-      tx.insert(results)
+      await tx.insert(results)
         .values({
           id: resultId,
           sessionId,
@@ -141,13 +139,12 @@ export async function calculateAndStoreSessionResults(sessionId: string, userId:
           personalitySpectrumsJson: JSON.stringify(personality),
           topValuesJson: JSON.stringify(values.topValues),
           createdAt: now,
-        })
-        .run();
+        });
     }
 
     // Insert career matches
     for (const match of careerList) {
-      tx.insert(careerMatches)
+      await tx.insert(careerMatches)
         .values({
           id: crypto.randomUUID(),
           resultId,
@@ -160,8 +157,7 @@ export async function calculateAndStoreSessionResults(sessionId: string, userId:
           consultantNotes: null,
           createdAt: now,
           updatedAt: now,
-        })
-        .run();
+        });
     }
   });
 
@@ -205,23 +201,24 @@ export async function getReportDataForUser(
   userId: string,
   sessionId?: string | null
 ): Promise<ReportPayload | null> {
-  const user = db.select().from(users).where(eq(users.id, userId)).get();
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) return null;
 
   // Find result: either specified session or user's most recent result
-  let resultRecord = sessionId
-    ? db.select().from(results).where(and(eq(results.sessionId, sessionId), eq(results.userId, userId))).get()
-    : db.select().from(results).where(eq(results.userId, userId)).orderBy(desc(results.createdAt)).get();
+  let [resultRecord] = sessionId
+    ? await db.select().from(results).where(and(eq(results.sessionId, sessionId), eq(results.userId, userId))).limit(1)
+    : await db.select().from(results).where(eq(results.userId, userId)).orderBy(desc(results.createdAt)).limit(1);
 
   // If no result yet, but session exists, try calculating
   if (!resultRecord) {
-    const targetSession = sessionId
-      ? db.select().from(testSessions).where(and(eq(testSessions.id, sessionId), eq(testSessions.userId, userId))).get()
-      : db.select().from(testSessions).where(eq(testSessions.userId, userId)).orderBy(desc(testSessions.updatedAt)).get();
+    const [targetSession] = sessionId
+      ? await db.select().from(testSessions).where(and(eq(testSessions.id, sessionId), eq(testSessions.userId, userId))).limit(1)
+      : await db.select().from(testSessions).where(eq(testSessions.userId, userId)).orderBy(desc(testSessions.updatedAt)).limit(1);
 
     if (targetSession) {
       await calculateAndStoreSessionResults(targetSession.id, userId);
-      resultRecord = db.select().from(results).where(eq(results.sessionId, targetSession.id)).get();
+      const [calculated] = await db.select().from(results).where(eq(results.sessionId, targetSession.id)).limit(1);
+      resultRecord = calculated;
     }
   }
 
@@ -263,12 +260,11 @@ export async function getReportDataForUser(
   }
 
   // If user is PAID: Return full report including personality, careers, and colleges
-  const storedMatches = db
+  const storedMatches = await db
     .select()
     .from(careerMatches)
     .where(eq(careerMatches.resultId, resultRecord.id))
-    .orderBy(desc(careerMatches.fitPercent))
-    .all();
+    .orderBy(desc(careerMatches.fitPercent));
 
   const formattedCareers: MatchedCareerResult[] = storedMatches.map((cm) => ({
     careerId: cm.id,
@@ -285,8 +281,8 @@ export async function getReportDataForUser(
   }));
 
   // Match colleges based on student profile
-  const profile = db.select().from(studentProfiles).where(eq(studentProfiles.userId, userId)).get();
-  const allColleges = db.select().from(colleges).all();
+  const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.userId, userId)).limit(1);
+  const allColleges = await db.select().from(colleges);
 
   let preferredCities: string[] = [];
   try {

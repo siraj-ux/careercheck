@@ -57,7 +57,7 @@ export async function POST() {
     const now = new Date().toISOString();
 
     // Record order in payments table
-    db.insert(payments)
+    await db.insert(payments)
       .values({
         id: crypto.randomUUID(),
         userId: user.id,
@@ -68,8 +68,7 @@ export async function POST() {
         razorpayOrderId: orderId,
         createdAt: now,
         updatedAt: now,
-      })
-      .run();
+      });
 
     return NextResponse.json({
       success: true,

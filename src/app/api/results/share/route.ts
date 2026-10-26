@@ -24,11 +24,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Get user's result record
-    const resultRecord = db
+    const [resultRecord] = await db
       .select({ id: results.id })
       .from(results)
       .where(eq(results.userId, user.id))
-      .get();
+      .limit(1);
 
     if (!resultRecord) {
       return NextResponse.json(
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    db.insert(parentShareLinks)
+    await db.insert(parentShareLinks)
       .values({
         id: crypto.randomUUID(),
         resultId: resultRecord.id,
@@ -52,8 +52,7 @@ export async function POST(req: NextRequest) {
         expiresAt,
         revokedAt: null,
         createdAt: now.toISOString(),
-      })
-      .run();
+      });
 
     const origin = req.nextUrl.origin;
     const shareUrl = `${origin}/report/share/${rawToken}`;
@@ -84,7 +83,7 @@ export async function GET(req: NextRequest) {
     const tokenHash = hashToken(token);
     const nowIso = new Date().toISOString();
 
-    const link = db
+    const [link] = await db
       .select()
       .from(parentShareLinks)
       .where(
@@ -94,7 +93,7 @@ export async function GET(req: NextRequest) {
           isNull(parentShareLinks.revokedAt)
         )
       )
-      .get();
+      .limit(1);
 
     if (!link) {
       return NextResponse.json(
@@ -106,7 +105,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const student = db.select({ name: users.name, plan: users.plan, level: users.level }).from(users).where(eq(users.id, link.userId)).get();
+    const [student] = await db.select({ name: users.name, plan: users.plan, level: users.level }).from(users).where(eq(users.id, link.userId)).limit(1);
 
     const report = await getReportDataForUser(link.userId);
     if (!report) {

@@ -1,8 +1,8 @@
-import { sqliteTable, text, index } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { consultants } from './consultants';
 
-export const messages = sqliteTable(
+export const messages = pgTable(
   'messages',
   {
     id: text('id').primaryKey(),

@@ -1,8 +1,8 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { consultants } from './consultants';
 
-export const roadmaps = sqliteTable(
+export const roadmaps = pgTable(
   'roadmaps',
   {
     id: text('id').primaryKey(),
@@ -26,7 +26,7 @@ export const roadmaps = sqliteTable(
   ]
 );
 
-export const roadmapMilestones = sqliteTable(
+export const roadmapMilestones = pgTable(
   'roadmap_milestones',
   {
     id: text('id').primaryKey(),

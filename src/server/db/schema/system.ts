@@ -1,8 +1,8 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { results } from './tests';
 
-export const otpCodes = sqliteTable(
+export const otpCodes = pgTable(
   'otp_codes',
   {
     id: text('id').primaryKey(),
@@ -19,7 +19,7 @@ export const otpCodes = sqliteTable(
   ]
 );
 
-export const parentShareLinks = sqliteTable(
+export const parentShareLinks = pgTable(
   'parent_share_links',
   {
     id: text('id').primaryKey(),
@@ -40,7 +40,7 @@ export const parentShareLinks = sqliteTable(
   ]
 );
 
-export const notifications = sqliteTable(
+export const notifications = pgTable(
   'notifications',
   {
     id: text('id').primaryKey(),
@@ -61,7 +61,7 @@ export const notifications = sqliteTable(
   ]
 );
 
-export const auditLogs = sqliteTable(
+export const auditLogs = pgTable(
   'audit_logs',
   {
     id: text('id').primaryKey(),
@@ -80,7 +80,7 @@ export const auditLogs = sqliteTable(
   ]
 );
 
-export const appConfigs = sqliteTable('app_configs', {
+export const appConfigs = pgTable('app_configs', {
   key: text('key').primaryKey(),
   valueJson: text('value_json').notNull(),
   updatedAt: text('updated_at').notNull(),

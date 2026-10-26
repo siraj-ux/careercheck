@@ -1,6 +1,6 @@
-import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, real, index } from 'drizzle-orm/pg-core';
 
-export const users = sqliteTable(
+export const users = pgTable(
   'users',
   {
     id: text('id').primaryKey(),
@@ -19,7 +19,7 @@ export const users = sqliteTable(
   ]
 );
 
-export const studentProfiles = sqliteTable(
+export const studentProfiles = pgTable(
   'student_profiles',
   {
     id: text('id').primaryKey(),
@@ -43,15 +43,17 @@ export const studentProfiles = sqliteTable(
     budgetAmount: integer('budget_amount'), // in INR
     loanOpenness: integer('loan_openness').notNull().default(0), // 0 or 1
     knowledgeLevel: integer('knowledge_level'), // 1 to 5
+    assignedConsultantId: text('assigned_consultant_id'), // References consultants.id
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [
     index('student_profiles_user_idx').on(table.userId),
+    index('student_profiles_consultant_idx').on(table.assignedConsultantId),
   ]
 );
 
-export const authSessions = sqliteTable(
+export const authSessions = pgTable(
   'auth_sessions',
   {
     id: text('id').primaryKey(),
@@ -70,7 +72,7 @@ export const authSessions = sqliteTable(
   ]
 );
 
-export const consentRecords = sqliteTable(
+export const consentRecords = pgTable(
   'consent_records',
   {
     id: text('id').primaryKey(),

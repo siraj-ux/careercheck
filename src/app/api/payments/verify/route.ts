@@ -33,13 +33,12 @@ export async function POST(req: NextRequest) {
 
       if (expectedSignature !== razorpay_signature) {
         // Record payment failure idempotently
-        db.update(payments)
+        await db.update(payments)
           .set({
             status: 'failed',
             updatedAt: new Date().toISOString(),
           })
-          .where(eq(payments.razorpayOrderId, razorpay_order_id))
-          .run();
+          .where(eq(payments.razorpayOrderId, razorpay_order_id));
 
         return NextResponse.json(
           {
@@ -56,12 +55,12 @@ export async function POST(req: NextRequest) {
     // Idempotent database update in short transaction
     let alreadyCaptured = false;
 
-    db.transaction((tx) => {
-      const paymentRecord = tx
+    await db.transaction(async (tx) => {
+      const [paymentRecord] = await tx
         .select()
         .from(payments)
         .where(eq(payments.razorpayOrderId, razorpay_order_id))
-        .get();
+        .limit(1);
 
       if (paymentRecord && paymentRecord.status === 'captured') {
         alreadyCaptured = true;
@@ -69,18 +68,17 @@ export async function POST(req: NextRequest) {
       }
 
       if (paymentRecord) {
-        tx.update(payments)
+        await tx.update(payments)
           .set({
             status: 'captured',
             razorpayPaymentId: razorpay_payment_id,
             razorpaySignature: razorpay_signature || 'mock_verified_signature',
             updatedAt: now,
           })
-          .where(eq(payments.id, paymentRecord.id))
-          .run();
+          .where(eq(payments.id, paymentRecord.id));
       } else {
         // Fallback insert if order was generated externally
-        tx.insert(payments)
+        await tx.insert(payments)
           .values({
             id: crypto.randomUUID(),
             userId: user.id,
@@ -93,21 +91,19 @@ export async function POST(req: NextRequest) {
             razorpaySignature: razorpay_signature || 'mock_verified_signature',
             createdAt: now,
             updatedAt: now,
-          })
-          .run();
+          });
       }
 
       // Upgrade student plan to paid
-      tx.update(users)
+      await tx.update(users)
         .set({
           plan: 'paid',
           updatedAt: now,
         })
-        .where(eq(users.id, user.id))
-        .run();
+        .where(eq(users.id, user.id));
 
       // Trigger activation notification
-      tx.insert(notifications)
+      await tx.insert(notifications)
         .values({
           id: crypto.randomUUID(),
           userId: user.id,
@@ -116,8 +112,7 @@ export async function POST(req: NextRequest) {
           body: 'Your payment was successful. Full report, consultant consultation, and personalized roadmap are now unlocked.',
           payloadJson: JSON.stringify({ orderId: razorpay_order_id, paymentId: razorpay_payment_id }),
           createdAt: now,
-        })
-        .run();
+        });
     });
 
     return NextResponse.json({

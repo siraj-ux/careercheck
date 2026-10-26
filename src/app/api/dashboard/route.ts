@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { eq, and, desc, asc } from 'drizzle-orm';
 import { db } from '@/server/db/client';
 import { getCurrentUser } from '@/server/auth/session';
-import { users } from '@/server/db/schema/users';
+import { users, studentProfiles } from '@/server/db/schema/users';
 import { roadmaps, roadmapMilestones } from '@/server/db/schema/roadmaps';
 import { sessions, consultants } from '@/server/db/schema/consultants';
 import { messages } from '@/server/db/schema/messages';
@@ -19,14 +19,14 @@ export async function GET() {
     const now = new Date();
 
     // 1. Fetch user's assessment result existence
-    const userResult = db
+    const [userResult] = await db
       .select({ id: results.id, riasecCode: results.riasecCode, createdAt: results.createdAt })
       .from(results)
       .where(eq(results.userId, user.id))
-      .get();
+      .limit(1);
 
     // 2. Fetch upcoming session
-    const upcomingSession = db
+    const [upcomingSession] = await db
       .select({
         sessionId: sessions.id,
         scheduledAt: sessions.scheduledAt,
@@ -42,7 +42,7 @@ export async function GET() {
       .innerJoin(users, eq(consultants.userId, users.id))
       .where(and(eq(sessions.studentId, user.id), eq(sessions.status, 'scheduled')))
       .orderBy(asc(sessions.scheduledAt))
-      .get();
+      .limit(1);
 
     let sessionState = null;
     if (upcomingSession) {
@@ -59,11 +59,10 @@ export async function GET() {
     }
 
     // 3. Fetch published roadmaps (Primary and Backup)
-    const publishedRoadmaps = db
+    const publishedRoadmaps = await db
       .select()
       .from(roadmaps)
-      .where(and(eq(roadmaps.studentId, user.id), eq(roadmaps.isPublished, 1)))
-      .all();
+      .where(and(eq(roadmaps.studentId, user.id), eq(roadmaps.isPublished, 1)));
 
     const primaryRoadmapRecord = publishedRoadmaps.find((r) => r.planType === 'primary');
     const backupRoadmapRecord = publishedRoadmaps.find((r) => r.planType === 'backup');
@@ -72,21 +71,19 @@ export async function GET() {
     let backupMilestones: (typeof roadmapMilestones.$inferSelect)[] = [];
 
     if (primaryRoadmapRecord) {
-      primaryMilestones = db
+      primaryMilestones = await db
         .select()
         .from(roadmapMilestones)
         .where(eq(roadmapMilestones.roadmapId, primaryRoadmapRecord.id))
-        .orderBy(asc(roadmapMilestones.orderIndex))
-        .all();
+        .orderBy(asc(roadmapMilestones.orderIndex));
     }
 
     if (backupRoadmapRecord) {
-      backupMilestones = db
+      backupMilestones = await db
         .select()
         .from(roadmapMilestones)
         .where(eq(roadmapMilestones.roadmapId, backupRoadmapRecord.id))
-        .orderBy(asc(roadmapMilestones.orderIndex))
-        .all();
+        .orderBy(asc(roadmapMilestones.orderIndex));
     }
 
     // Determine Next Step Hero
@@ -109,7 +106,7 @@ export async function GET() {
     }
 
     // 4. Fetch recent chat message with consultant
-    const latestMessage = db
+    const [latestMessage] = await db
       .select({
         id: messages.id,
         body: messages.body,
@@ -119,10 +116,10 @@ export async function GET() {
       .from(messages)
       .where(eq(messages.studentId, user.id))
       .orderBy(desc(messages.createdAt))
-      .get();
+      .limit(1);
 
     // 5. Fetch saved colleges count and preview
-    const saved = db
+    const saved = await db
       .select({
         savedId: savedColleges.id,
         collegeId: colleges.id,
@@ -133,8 +130,38 @@ export async function GET() {
       })
       .from(savedColleges)
       .innerJoin(colleges, eq(savedColleges.collegeId, colleges.id))
-      .where(eq(savedColleges.studentId, user.id))
-      .all();
+      .where(eq(savedColleges.studentId, user.id));
+
+    // 6. Fetch assigned consultant if any
+    const [profile] = await db
+      .select({ assignedConsultantId: studentProfiles.assignedConsultantId })
+      .from(studentProfiles)
+      .where(eq(studentProfiles.userId, user.id))
+      .limit(1);
+
+    let assignedConsultant = null;
+    if (profile?.assignedConsultantId) {
+      const [cons] = await db
+        .select({
+          id: consultants.id,
+          title: consultants.title,
+          rating: consultants.rating,
+          name: users.name,
+        })
+        .from(consultants)
+        .innerJoin(users, eq(consultants.userId, users.id))
+        .where(eq(consultants.id, profile.assignedConsultantId))
+        .limit(1);
+
+      if (cons) {
+        assignedConsultant = {
+          id: cons.id,
+          title: cons.title,
+          rating: cons.rating,
+          name: cons.name || 'Mentor',
+        };
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -150,6 +177,7 @@ export async function GET() {
         : null,
       nextStepHero,
       session: sessionState,
+      assignedConsultant,
       roadmap: {
         hasRoadmap: publishedRoadmaps.length > 0,
         primary: primaryMilestones,

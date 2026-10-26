@@ -1,7 +1,11 @@
+import { eq } from 'drizzle-orm';
 import { db } from './client';
-import { questions } from './schema/tests';
+import { questions, results, testSessions } from './schema/tests';
 import { colleges } from './schema/colleges';
 import { appConfigs } from './schema/system';
+import { users, studentProfiles } from './schema/users';
+import { consultants, sessions } from './schema/consultants';
+import { careerMatches } from './schema/careers';
 
 export async function seedDatabase() {
   console.log('🌱 Starting CareerChecks database seed...');
@@ -17,17 +21,16 @@ export async function seedDatabase() {
   ];
 
   for (const cfg of defaultConfigs) {
-    db.insert(appConfigs)
+    await db.insert(appConfigs)
       .values({ ...cfg, updatedAt: now })
-      .onConflictDoUpdate({ target: appConfigs.key, set: { valueJson: cfg.valueJson, updatedAt: now } })
-      .run();
+      .onConflictDoUpdate({ target: appConfigs.key, set: { valueJson: cfg.valueJson, updatedAt: now } });
   }
 
   // 2. Questions
   console.log('Seeding question bank (Interests, Aptitude, Personality, Values, PG Domain)...');
 
   // Check if questions are already seeded
-  const existingQuestions = db.select({ id: questions.id }).from(questions).limit(1).all();
+  const existingQuestions = await db.select({ id: questions.id }).from(questions).limit(1);
   if (existingQuestions.length > 0) {
     console.log('✅ Question bank already seeded, skipping question insert.');
   } else {
@@ -643,9 +646,7 @@ export async function seedDatabase() {
     // Insert all questions in chunks of 50
     for (let i = 0; i < questionBatch.length; i += 50) {
       const chunk = questionBatch.slice(i, i + 50);
-      for (const q of chunk) {
-        db.insert(questions).values(q).run();
-      }
+      await db.insert(questions).values(chunk);
     }
 
     console.log(`✅ Seeded ${questionBatch.length} psychometric questions.`);
@@ -653,7 +654,7 @@ export async function seedDatabase() {
 
   // 3. Seed Sample Colleges (~10 representative Indian colleges)
   console.log('Seeding sample colleges...');
-  const existingColleges = db.select({ id: colleges.id }).from(colleges).limit(1).all();
+  const existingColleges = await db.select({ id: colleges.id }).from(colleges).limit(1);
   if (existingColleges.length === 0) {
     const sampleColleges = [
     {
@@ -737,8 +738,229 @@ export async function seedDatabase() {
   ];
 
     for (const col of sampleColleges) {
-      db.insert(colleges).values(col).run();
+      await db.insert(colleges).values(col);
     }
+  }
+
+  // 4. Seed Multi-Role Demo Accounts (Admin, Consultants, Students)
+  console.log('Seeding demo accounts for all 4 roles...');
+
+  // A. Admin Account
+  const [existingAdmin] = await db.select({ id: users.id }).from(users).where(eq(users.phone, '+919999999999')).limit(1);
+  if (!existingAdmin) {
+    await db.insert(users).values({
+      id: 'usr-admin-demo',
+      phone: '+919999999999',
+      role: 'admin',
+      name: 'Admissions Director',
+      level: null,
+      plan: 'paid',
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  // B. Consultants
+  const [existingConsultant] = await db.select({ id: consultants.id }).from(consultants).where(eq(consultants.id, 'cns-priya')).limit(1);
+  if (!existingConsultant) {
+    // Consultant Priya
+    await db.insert(users).values({
+      id: 'usr-priya-demo',
+      phone: '+919888888881',
+      role: 'consultant',
+      name: 'Priya Sharma',
+      level: null,
+      plan: 'paid',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await db.insert(consultants).values({
+      id: 'cns-priya',
+      userId: 'usr-priya-demo',
+      title: 'Senior UX & Creative Careers Specialist',
+      credentialsJson: JSON.stringify(['NID Ahmedabad Alum', '300+ Students Mentored', 'Ex-Design Director']),
+      bio: 'Helping students find their voice in design, architecture, and technology domains.',
+      languagesJson: JSON.stringify(['English', 'Hindi']),
+      specialisationsJson: JSON.stringify(['Design', 'Media', 'Technology']),
+      rating: 4.9,
+      studentCount: 1,
+      isActive: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Consultant Rajesh
+    await db.insert(users).values({
+      id: 'usr-rajesh-demo',
+      phone: '+919888888882',
+      role: 'consultant',
+      name: 'Dr. Rajesh Kumar',
+      level: null,
+      plan: 'paid',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await db.insert(consultants).values({
+      id: 'cns-rajesh',
+      userId: 'usr-rajesh-demo',
+      title: 'Principal Engineering & Management Counselor',
+      credentialsJson: JSON.stringify(['PhD IIT Delhi', '15+ Years Counseling Experience', 'Certified Career Coach']),
+      bio: 'Guiding STEM aspirants into premier engineering colleges and emerging technical careers.',
+      languagesJson: JSON.stringify(['English', 'Hindi', 'Marathi']),
+      specialisationsJson: JSON.stringify(['Engineering', 'Technology', 'Management']),
+      rating: 4.8,
+      studentCount: 0,
+      isActive: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  // C. Paid Student (Diya Patel) assigned to Priya
+  const [existingDiya] = await db.select({ id: users.id }).from(users).where(eq(users.phone, '+919777777771')).limit(1);
+  if (!existingDiya) {
+    await db.insert(users).values({
+      id: 'usr-diya-demo',
+      phone: '+919777777771',
+      role: 'student',
+      name: 'Diya Patel',
+      level: 'UG',
+      plan: 'paid',
+      dob: '2007-04-12',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await db.insert(studentProfiles).values({
+      id: 'prof-diya-demo',
+      userId: 'usr-diya-demo',
+      board: 'CBSE',
+      stream: 'Science PCM',
+      marksPercent: 91.5,
+      interestsJson: JSON.stringify(['Design', 'Technology', 'Media']),
+      preferredCitiesJson: JSON.stringify(['Pune', 'Bengaluru', 'Delhi']),
+      relocate: 1,
+      budgetBand: '5L - 10L',
+      budgetAmount: 750000,
+      loanOpenness: 0,
+      knowledgeLevel: 4,
+      assignedConsultantId: 'cns-priya',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Completed test session & results for Diya
+    await db.insert(testSessions).values({
+      id: 'sess-diya-demo',
+      userId: 'usr-diya-demo',
+      level: 'UG',
+      status: 'completed',
+      currentSection: 'values',
+      currentQuestionIndex: 20,
+      startedAt: now,
+      completedAt: now,
+      updatedAt: now,
+    });
+
+    await db.insert(results).values({
+      id: 'res-diya-demo',
+      sessionId: 'sess-diya-demo',
+      userId: 'usr-diya-demo',
+      riasecCode: 'AIR',
+      radarScoresJson: JSON.stringify({ A: 92, I: 84, R: 78, S: 65, E: 55, C: 40 }),
+      aptitudeScoresJson: JSON.stringify({ logical: 85, verbal: 90, spatial: 95, overall: 90 }),
+      personalitySpectrumsJson: JSON.stringify({
+        'Reserved to Outgoing': 65,
+        'Spontaneous to Organised': 75,
+        'Practical to Imaginative': 88,
+        'Competitive to Collaborative': 80,
+        'Calm to Sensitive': 50,
+      }),
+      topValuesJson: JSON.stringify(['Creativity', 'Independence', 'Impact']),
+      createdAt: now,
+    });
+
+    // Career Matches for Diya
+    await db.insert(careerMatches).values({
+      id: 'cm-diya-1',
+      resultId: 'res-diya-demo',
+      userId: 'usr-diya-demo',
+      cluster: 'Design',
+      title: 'UX / Product Designer',
+      fitPercent: 94,
+      reasonsJson: JSON.stringify(['Exceptional spatial aptitude (95%)', 'Dominant Artistic interest (92%)', 'High alignment with visual prototyping']),
+      consultantStatus: 'accepted',
+      consultantNotes: 'Strong creative portfolio potential. Recommend focusing on SEED and NID admissions.',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await db.insert(careerMatches).values({
+      id: 'cm-diya-2',
+      resultId: 'res-diya-demo',
+      userId: 'usr-diya-demo',
+      cluster: 'Technology',
+      title: 'Human-Computer Interaction (HCI) Engineer',
+      fitPercent: 88,
+      reasonsJson: JSON.stringify(['High logical reasoning (85%)', 'Strong intersection of design and programming']),
+      consultantStatus: 'pending',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Upcoming Session for Diya today at 3:00 PM IST
+    const todaySlot = new Date();
+    todaySlot.setHours(9, 30, 0, 0); // 9:30 UTC = 15:00 IST
+    await db.insert(sessions).values({
+      id: 'session-diya-demo',
+      studentId: 'usr-diya-demo',
+      consultantId: 'cns-priya',
+      scheduledAt: todaySlot.toISOString(),
+      durationMinutes: 45,
+      status: 'scheduled',
+      joinLink: 'https://meet.google.com/cck-test-call',
+      rescheduleCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  // D. Unassigned Paid Student (Sana Khan) for Admin Assignment Queue
+  const [existingSana] = await db.select({ id: users.id }).from(users).where(eq(users.phone, '+919777777773')).limit(1);
+  if (!existingSana) {
+    await db.insert(users).values({
+      id: 'usr-sana-demo',
+      phone: '+919777777773',
+      role: 'student',
+      name: 'Sana Khan',
+      level: 'UG',
+      plan: 'paid',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await db.insert(studentProfiles).values({
+      id: 'prof-sana-demo',
+      userId: 'usr-sana-demo',
+      board: 'State',
+      stream: 'Science PCM',
+      marksPercent: 88.0,
+      interestsJson: JSON.stringify(['Technology', 'Engineering']),
+      preferredCitiesJson: JSON.stringify(['Lucknow', 'Delhi']),
+      relocate: 1,
+      budgetBand: '2L - 5L',
+      budgetAmount: 400000,
+      loanOpenness: 1,
+      assignedConsultantId: null, // Unassigned!
+      createdAt: now,
+      updatedAt: now,
+    });
+  } else {
+    await db.update(studentProfiles)
+      .set({ assignedConsultantId: null })
+      .where(eq(studentProfiles.userId, 'usr-sana-demo'));
   }
 
   console.log('🎉 Database seed completed successfully!');

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -15,7 +15,14 @@ import {
   Sparkles,
   AlertCircle,
   FileText,
+  Download,
+  ShieldCheck,
+  Trash2,
 } from 'lucide-react';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { BookingModal } from '@/components/booking/BookingModal';
+import { ChatDrawer } from '@/components/chat/ChatDrawer';
+import { OfflineBanner } from '@/components/common/OfflineBanner';
 
 interface Milestone {
   id: string;
@@ -60,6 +67,12 @@ interface DashboardState {
     diffMinutes: number;
     canJoin: boolean;
   } | null;
+  assignedConsultant: {
+    id: string;
+    name: string;
+    title: string;
+    rating: number;
+  } | null;
   roadmap: {
     hasRoadmap: boolean;
     primary: Milestone[];
@@ -89,8 +102,11 @@ export default function StudentDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardState | null>(null);
   const [roadmapTab, setRoadmapTab] = useState<'primary' | 'backup'>('primary');
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
-  useEffect(() => {
+  const fetchDashboard = useCallback(() => {
     fetch('/api/dashboard')
       .then((res) => {
         if (res.status === 401) {
@@ -107,6 +123,10 @@ export default function StudentDashboardPage() {
       })
       .catch(() => setLoading(false));
   }, [router]);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   if (loading) {
     return (
@@ -160,6 +180,8 @@ export default function StudentDashboardPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50/70 pb-24 md:pb-16">
+      <OfflineBanner />
+
       {/* Top Header */}
       <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 h-16">
@@ -173,6 +195,8 @@ export default function StudentDashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <NotificationBell />
+
             <Link
               href="/report"
               className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 px-3.5 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-all"
@@ -450,14 +474,37 @@ export default function StudentDashboardPage() {
                 </div>
               ) : (
                 /* Empty state for sessions */
-                <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-center space-y-2">
-                  <p className="text-xs text-zinc-600">No session scheduled yet.</p>
-                  <button
-                    type="button"
-                    className="inline-block rounded-full bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white"
-                  >
-                    Find a consultant
-                  </button>
+                <div className="rounded-2xl border border-dashed border-zinc-200 p-4 text-center space-y-2.5">
+                  {data.assignedConsultant ? (
+                    <>
+                      <div>
+                        <div className="text-xs font-bold text-zinc-900">{data.assignedConsultant.name}</div>
+                        <div className="text-[11px] text-zinc-500">{data.assignedConsultant.title}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setBookingOpen(true)}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700"
+                      >
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>Book 45-Min Session</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-zinc-600">
+                        {isPaid
+                          ? 'Admissions team is pairing your profile with a certified counselor.'
+                          : 'Unlock Career Plan to book a 1-on-1 strategy consultation.'}
+                      </p>
+                      <Link
+                        href={isPaid ? '/report' : '/pricing'}
+                        className="inline-block rounded-full bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white"
+                      >
+                        {isPaid ? 'Review Assessment' : 'Find a consultant'}
+                      </Link>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -488,7 +535,9 @@ export default function StudentDashboardPage() {
 
               <button
                 type="button"
-                className="flex w-full items-center justify-center gap-2 rounded-full border border-zinc-200 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+                onClick={() => setChatOpen(true)}
+                disabled={!data.assignedConsultant && !data.session}
+                className="flex w-full items-center justify-center gap-2 rounded-full border border-zinc-200 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <MessageSquare className="h-3.5 w-3.5 text-indigo-600" />
                 <span>Open Chat Thread</span>
@@ -526,7 +575,73 @@ export default function StudentDashboardPage() {
             </div>
           </aside>
         </div>
+
+        {/* Section 9.7 Compliance & Data Rights Footer Strip */}
+        <div className="mt-12 pt-8 border-t border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-zinc-500">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            <span>We never sell your data. Autosaved and confidential.</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href="/api/profile/export"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 font-medium text-zinc-700 hover:bg-zinc-50"
+            >
+              <Download className="h-3 w-3 text-indigo-600" />
+              <span>Export My Data (JSON)</span>
+            </a>
+
+            <button
+              type="button"
+              disabled={deletingAccount}
+              onClick={async () => {
+                if (window.confirm('Are you sure you want to delete your account? This action is permanent and purges your personal profile.')) {
+                  setDeletingAccount(true);
+                  await fetch('/api/profile/delete', { method: 'DELETE' });
+                  router.replace('/');
+                }
+              }}
+              className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50/60 px-3 py-1.5 font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3 text-red-600" />
+              <span>{deletingAccount ? 'Deleting...' : 'Delete Account'}</span>
+            </button>
+
+            <Link href="/privacy" className="hover:underline">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:underline">
+              Terms
+            </Link>
+          </div>
+        </div>
       </div>
+
+      {/* Booking Modal */}
+      {data.assignedConsultant && (
+        <BookingModal
+          consultantId={data.assignedConsultant.id}
+          consultantName={data.assignedConsultant.name}
+          isOpen={bookingOpen}
+          onClose={() => setBookingOpen(false)}
+          onSuccess={() => fetchDashboard()}
+        />
+      )}
+
+      {/* Direct Mentor Chat Drawer */}
+      {(data.assignedConsultant || data.session) && (
+        <ChatDrawer
+          currentUserId={user.id}
+          studentId={user.id}
+          consultantId={data.assignedConsultant?.id || ''}
+          recipientName={data.assignedConsultant?.name || data.session?.consultantName || 'Mentor'}
+          isOpen={chatOpen}
+          onClose={() => setChatOpen(false)}
+        />
+      )}
     </div>
   );
 }

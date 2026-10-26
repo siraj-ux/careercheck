@@ -36,11 +36,11 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized. Please log in.' }, { status: 401 });
     }
-    const profile = db
+    const [profile] = await db
       .select()
       .from(studentProfiles)
       .where(eq(studentProfiles.userId, user.id))
-      .get();
+      .limit(1);
 
     return NextResponse.json({
       success: true,
@@ -79,15 +79,14 @@ export async function POST(req: Request) {
 
     // Update users table fields
     if (data.name !== undefined || data.level !== undefined || data.dob !== undefined) {
-      db.update(users)
+      await db.update(users)
         .set({
           ...(data.name !== undefined ? { name: data.name } : {}),
           ...(data.level !== undefined ? { level: data.level } : {}),
           ...(data.dob !== undefined ? { dob: data.dob } : {}),
           updatedAt: now,
         })
-        .where(eq(users.id, user.id))
-        .run();
+        .where(eq(users.id, user.id));
     }
 
     // Update or insert studentProfiles table
@@ -110,27 +109,25 @@ export async function POST(req: Request) {
     if (data.loanOpenness !== undefined) profileUpdates.loanOpenness = data.loanOpenness ? 1 : 0;
     if (data.knowledgeLevel !== undefined) profileUpdates.knowledgeLevel = data.knowledgeLevel;
 
-    const existingProfile = db
+    const [existingProfile] = await db
       .select({ id: studentProfiles.id })
       .from(studentProfiles)
       .where(eq(studentProfiles.userId, user.id))
-      .get();
+      .limit(1);
 
     if (existingProfile) {
-      db.update(studentProfiles)
+      await db.update(studentProfiles)
         .set(profileUpdates)
-        .where(eq(studentProfiles.id, existingProfile.id))
-        .run();
+        .where(eq(studentProfiles.id, existingProfile.id));
     } else {
-      db.insert(studentProfiles)
+      await db.insert(studentProfiles)
         .values({
           id: crypto.randomUUID(),
           userId: user.id,
           createdAt: now,
           updatedAt: now,
           ...profileUpdates,
-        })
-        .run();
+        });
     }
 
     return NextResponse.json({ success: true, savedAt: now });

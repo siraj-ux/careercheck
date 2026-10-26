@@ -37,12 +37,12 @@ export async function POST(req: NextRequest) {
     const now = new Date().toISOString();
 
     if (eventType === 'payment.captured' || eventType === 'order.paid') {
-      db.transaction((tx) => {
-        const existing = tx
+      await db.transaction(async (tx) => {
+        const [existing] = await tx
           .select()
           .from(payments)
           .where(eq(payments.razorpayOrderId, orderId))
-          .get();
+          .limit(1);
 
         if (existing && existing.status === 'captured') {
           // Idempotent: repeated webhook never double-credits
@@ -50,25 +50,23 @@ export async function POST(req: NextRequest) {
         }
 
         if (existing) {
-          tx.update(payments)
+          await tx.update(payments)
             .set({
               status: 'captured',
               razorpayPaymentId: paymentId || existing.razorpayPaymentId,
               updatedAt: now,
             })
-            .where(eq(payments.id, existing.id))
-            .run();
+            .where(eq(payments.id, existing.id));
 
           // Unlock paid plan for user
-          tx.update(users)
+          await tx.update(users)
             .set({
               plan: 'paid',
               updatedAt: now,
             })
-            .where(eq(users.id, existing.userId))
-            .run();
+            .where(eq(users.id, existing.userId));
 
-          tx.insert(notifications)
+          await tx.insert(notifications)
             .values({
               id: crypto.randomUUID(),
               userId: existing.userId,
@@ -76,18 +74,16 @@ export async function POST(req: NextRequest) {
               title: 'Career Plan Activated (Webhook)',
               body: 'Your payment was successfully confirmed via payment gateway webhook.',
               createdAt: now,
-            })
-            .run();
+            });
         }
       });
     } else if (eventType === 'payment.failed') {
-      db.update(payments)
+      await db.update(payments)
         .set({
           status: 'failed',
           updatedAt: now,
         })
-        .where(eq(payments.razorpayOrderId, orderId))
-        .run();
+        .where(eq(payments.razorpayOrderId, orderId));
     }
 
     return NextResponse.json({ received: true, event: eventType });

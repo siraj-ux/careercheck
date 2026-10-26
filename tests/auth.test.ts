@@ -86,17 +86,17 @@ describe('Authentication & Minor Consent Suite', () => {
       expect(verifyRes.user?.phone).toBe(newPhone);
 
       // Verify DB records
-      const userRecord = db.select().from(users).where(eq(users.phone, newPhone)).get();
+      const [userRecord] = await db.select().from(users).where(eq(users.phone, newPhone)).limit(1);
       expect(userRecord).toBeDefined();
       expect(userRecord?.role).toBe('student');
       expect(userRecord?.plan).toBe('free');
       expect(userRecord?.dob).toBeNull();
 
-      const profileRecord = db
+      const [profileRecord] = await db
         .select()
         .from(studentProfiles)
         .where(eq(studentProfiles.userId, userRecord!.id))
-        .get();
+        .limit(1);
       expect(profileRecord).toBeDefined();
     });
   });
@@ -119,11 +119,11 @@ describe('Authentication & Minor Consent Suite', () => {
       expect(loginRes.isNewUser).toBe(false);
 
       // Ensure exact 1 user record exists
-      const userCount = db
+      const [userCount] = await db
         .select({ count: count() })
         .from(users)
         .where(eq(users.phone, returningPhone))
-        .get();
+        .limit(1);
       expect(userCount?.count).toBe(1);
     });
   });
@@ -140,7 +140,7 @@ describe('Authentication & Minor Consent Suite', () => {
       const parentPhone = '+919876543210';
       const now = new Date().toISOString();
 
-      db.insert(users)
+      await db.insert(users)
         .values({
           id: minorUserId,
           phone: minorPhone,
@@ -148,8 +148,7 @@ describe('Authentication & Minor Consent Suite', () => {
           plan: 'free',
           createdAt: now,
           updatedAt: now,
-        })
-        .run();
+        });
 
       const result = await recordDobAndConsent({
         userId: minorUserId,
@@ -162,15 +161,15 @@ describe('Authentication & Minor Consent Suite', () => {
       expect(result.isMinor).toBe(true);
 
       // Verify user DOB updated
-      const updatedUser = db.select().from(users).where(eq(users.id, minorUserId)).get();
+      const [updatedUser] = await db.select().from(users).where(eq(users.id, minorUserId)).limit(1);
       expect(updatedUser?.dob).toBe('2010-06-15');
 
       // Verify consent record
-      const consent = db
+      const [consent] = await db
         .select()
         .from(consentRecords)
         .where(eq(consentRecords.userId, minorUserId))
-        .get();
+        .limit(1);
       expect(consent).toBeDefined();
       expect(consent?.parentPhone).toBe(parentPhone);
       expect(consent?.policyVersion).toBe('v1.0');
@@ -181,7 +180,7 @@ describe('Authentication & Minor Consent Suite', () => {
       const adultPhone = `+91984${crypto.randomInt(1000000, 9999999)}`;
       const now = new Date().toISOString();
 
-      db.insert(users)
+      await db.insert(users)
         .values({
           id: adultUserId,
           phone: adultPhone,
@@ -189,8 +188,7 @@ describe('Authentication & Minor Consent Suite', () => {
           plan: 'free',
           createdAt: now,
           updatedAt: now,
-        })
-        .run();
+        });
 
       const result = await recordDobAndConsent({
         userId: adultUserId,
@@ -200,7 +198,7 @@ describe('Authentication & Minor Consent Suite', () => {
       expect(result.success).toBe(true);
       expect(result.isMinor).toBe(false);
 
-      const updatedUser = db.select().from(users).where(eq(users.id, adultUserId)).get();
+      const [updatedUser] = await db.select().from(users).where(eq(users.id, adultUserId)).limit(1);
       expect(updatedUser?.dob).toBe('2002-03-20');
     });
   });

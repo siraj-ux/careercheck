@@ -210,9 +210,14 @@ function AuthContent() {
     }
   };
 
+  const isVerifyingRef = useRef(false);
+
   // Handle backspace and arrow navigation
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace') {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      triggerVerify();
+    } else if (e.key === 'Backspace') {
       if (!otp[index] && index > 0) {
         otpRefs.current[index - 1]?.focus();
         const newOtp = [...otp];
@@ -229,10 +234,14 @@ function AuthContent() {
   // Trigger verify action
   const triggerVerify = async (codeToVerify?: string) => {
     const code = codeToVerify || otp.join('');
-    if (code.length !== 6 || verifying) return;
+    if (code.length !== 6 || isVerifyingRef.current) return;
 
+    isVerifyingRef.current = true;
     setError(null);
     setVerifying(true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     try {
       const res = await fetch('/api/auth/otp', {
@@ -243,25 +252,36 @@ function AuthContent() {
           phone: fullPhone,
           code,
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
       const data = await res.json();
 
       if (!res.ok || !data.success) {
         setError(data.error || 'Incorrect code. Please try again.');
         setVerifying(false);
+        isVerifyingRef.current = false;
         return;
       }
 
       // Check if user requires DOB / Minor consent
-      if (data.requiresConsent) {
-        router.push(`/auth/consent?redirect=${encodeURIComponent(redirectParam)}`);
-      } else {
-        router.push(redirectParam);
-      }
-    } catch {
-      setError('A connection issue prevented verification. Please try again.');
+      const targetUrl = data.requiresConsent
+        ? `/auth/consent?redirect=${encodeURIComponent(redirectParam)}`
+        : redirectParam;
+
+      // Full document navigation guarantees the new session cookie is sent with request headers
+      window.location.assign(targetUrl);
+    } catch (err: unknown) {
+      clearTimeout(timeoutId);
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      setError(
+        isAbort
+          ? 'Verification request timed out. Please check your internet connection and try again.'
+          : 'A connection issue prevented verification. Please try again.'
+      );
       setVerifying(false);
+      isVerifyingRef.current = false;
     }
   };
 
@@ -410,6 +430,8 @@ function AuthContent() {
                     onClick={() => {
                       setStep('phone');
                       setError(null);
+                      setVerifying(false);
+                      isVerifyingRef.current = false;
                     }}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors mb-2"
                   >
@@ -514,6 +536,8 @@ function AuthContent() {
                     onClick={() => {
                       setStep('phone');
                       setError(null);
+                      setVerifying(false);
+                      isVerifyingRef.current = false;
                     }}
                     className="text-zinc-600 hover:text-zinc-900 underline"
                   >

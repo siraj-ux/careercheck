@@ -1,38 +1,47 @@
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import fs from 'fs';
-import path from 'path';
+import dns from 'dns';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema';
 
-const dbPath = process.env.DATABASE_URL || './data/careerchecks.sqlite';
-
-// Ensure the directory for the database file exists
-const dir = path.dirname(dbPath);
-if (!fs.existsSync(dir)) {
-  fs.mkdirSync(dir, { recursive: true });
+// Force Node.js to prioritize IPv4 DNS lookups to avoid ENOTFOUND on systems without IPv6 routing
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {
+  // Ignore if already set or unsupported in older runtimes
 }
 
-export function createSqliteConnection(targetPath: string = dbPath) {
-  const sqlite = new Database(targetPath, { timeout: 10000 });
-  
-  // Enforce mandatory PRAGMAs per database rules
-  sqlite.pragma('journal_mode = WAL');
-  sqlite.pragma('foreign_keys = ON');
-  sqlite.pragma('busy_timeout = 5000');
+const rawConnectionString =
+  process.env.DATABASE_URL ||
+  'postgresql://neondb_owner:npg_L9dmsv7kUrOA@ep-misty-frog-b4f6ctwl-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require';
 
-  return sqlite;
-}
+// Clean libpq-specific parameters not needed by node-postgres
+const connectionString = rawConnectionString.replace('&channel_binding=require', '').replace('channel_binding=require&', '');
 
-// Global cached connection for Next.js hot reload in development
+// Global cached pool for Next.js hot reload in development
 const globalForDb = globalThis as unknown as {
-  sqlite: Database.Database | undefined;
+  pool: Pool | undefined;
 };
 
-export const sqlite = globalForDb.sqlite ?? createSqliteConnection();
+export const pool =
+  globalForDb.pool ??
+  new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
+  });
+
+pool.on('error', (err) => {
+  // Catch background idle timeouts so they don't crash the process
+  console.warn('PostgreSQL idle client event:', err.message);
+});
 
 if (process.env.NODE_ENV !== 'production') {
-  globalForDb.sqlite = sqlite;
+  globalForDb.pool = pool;
 }
 
-export const db = drizzle(sqlite, { schema });
+export const db = drizzle(pool, { schema });
 export type DB = typeof db;

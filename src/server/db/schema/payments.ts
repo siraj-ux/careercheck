@@ -1,7 +1,7 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
 
-export const payments = sqliteTable(
+export const payments = pgTable(
   'payments',
   {
     id: text('id').primaryKey(),

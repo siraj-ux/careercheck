@@ -27,14 +27,15 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
   let testConsultantId: string;
 
   beforeAll(async () => {
-    // 1. Seed base database
+    console.time('seedDatabase');
     await seedDatabase();
+    console.timeEnd('seedDatabase');
 
     const now = new Date().toISOString();
 
-    // 2. Create test student
+    console.time('insertStudent');
     testUserId = crypto.randomUUID();
-    db.insert(users)
+    await db.insert(users)
       .values({
         id: testUserId,
         phone: `+9198765${crypto.randomInt(10000, 99999)}`,
@@ -44,10 +45,9 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
         level: 'UG',
         createdAt: now,
         updatedAt: now,
-      })
-      .run();
+      });
 
-    db.insert(studentProfiles)
+    await db.insert(studentProfiles)
       .values({
         id: crypto.randomUUID(),
         userId: testUserId,
@@ -58,12 +58,10 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
         preferredCitiesJson: JSON.stringify(['Bengaluru', 'Mumbai']),
         createdAt: now,
         updatedAt: now,
-      })
-      .run();
+      });
 
-    // 3. Create active test session for student
     testSessionId = crypto.randomUUID();
-    db.insert(testSessions)
+    await db.insert(testSessions)
       .values({
         id: testSessionId,
         userId: testUserId,
@@ -73,32 +71,29 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
         currentQuestionIndex: 0,
         startedAt: now,
         updatedAt: now,
-      })
-      .run();
+      });
+    console.timeEnd('insertStudent');
 
-    // 4. Answer sample questions for all sections
-    const allQuestions = db.select().from(questions).where(eq(questions.status, 'live')).all();
+    console.time('insertResponses');
+    const allQuestions = await db.select().from(questions).where(eq(questions.status, 'live'));
 
-    for (const q of allQuestions) {
-      let ans = '4';
-      if (q.type === 'mcq') {
-        ans = q.correctKey || 'A';
-      }
-      db.insert(responses)
-        .values({
-          id: crypto.randomUUID(),
-          sessionId: testSessionId,
-          questionId: q.id,
-          answer: ans,
-          timeTakenSeconds: 3,
-          createdAt: now,
-        })
-        .run();
+    const responseBatch = allQuestions.map((q) => ({
+      id: crypto.randomUUID(),
+      sessionId: testSessionId,
+      questionId: q.id,
+      answer: q.type === 'mcq' ? (q.correctKey || 'A') : '4',
+      timeTakenSeconds: 3,
+      createdAt: now,
+    }));
+
+    if (responseBatch.length > 0) {
+      await db.insert(responses).values(responseBatch);
     }
+    console.timeEnd('insertResponses');
 
-    // 5. Create a test consultant for session & roadmap tests
+    console.time('insertConsultant');
     testConsultantUserId = crypto.randomUUID();
-    db.insert(users)
+    await db.insert(users)
       .values({
         id: testConsultantUserId,
         phone: `+9191111${crypto.randomInt(10000, 99999)}`,
@@ -107,11 +102,10 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
         plan: 'paid',
         createdAt: now,
         updatedAt: now,
-      })
-      .run();
+      });
 
     testConsultantId = crypto.randomUUID();
-    db.insert(consultants)
+    await db.insert(consultants)
       .values({
         id: testConsultantId,
         userId: testConsultantUserId,
@@ -125,9 +119,9 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
         isActive: 1,
         createdAt: now,
         updatedAt: now,
-      })
-      .run();
-  });
+      });
+    console.timeEnd('insertConsultant');
+  }, 60000);
 
   it('1. Completing assessment calculates and persists results & career matches', async () => {
     const calcResult = await calculateAndStoreSessionResults(testSessionId, testUserId);
@@ -138,15 +132,14 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
     expect(calcResult.careers.length).toBe(6);
 
     // Verify stored in DB
-    const savedResult = db.select().from(results).where(eq(results.sessionId, testSessionId)).get();
+    const [savedResult] = await db.select().from(results).where(eq(results.sessionId, testSessionId)).limit(1);
     expect(savedResult).toBeDefined();
     expect(savedResult?.riasecCode).toBe(calcResult.riasec.code);
 
-    const savedMatches = db
+    const savedMatches = await db
       .select()
       .from(careerMatches)
-      .where(eq(careerMatches.resultId, savedResult!.id))
-      .all();
+      .where(eq(careerMatches.resultId, savedResult!.id));
     expect(savedMatches.length).toBe(6);
     expect(savedMatches[0].fitPercent).toBeGreaterThanOrEqual(45);
   });
@@ -177,7 +170,7 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
     const now = new Date().toISOString();
 
     // Step A: Order creation record in DB
-    db.insert(payments)
+    await db.insert(payments)
       .values({
         id: crypto.randomUUID(),
         userId: testUserId,
@@ -188,40 +181,37 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
         razorpayOrderId: orderId,
         createdAt: now,
         updatedAt: now,
-      })
-      .run();
+      });
 
-    const createdPayment = db
+    const [createdPayment] = await db
       .select()
       .from(payments)
       .where(eq(payments.razorpayOrderId, orderId))
-      .get();
+      .limit(1);
     expect(createdPayment?.status).toBe('created');
     expect(createdPayment?.amount).toBe(149900);
 
     // Step B: Verification & Capture
-    db.transaction((tx) => {
-      tx.update(payments)
+    await db.transaction(async (tx) => {
+      await tx.update(payments)
         .set({
           status: 'captured',
           razorpayPaymentId: paymentId,
           razorpaySignature: signature,
           updatedAt: new Date().toISOString(),
         })
-        .where(eq(payments.razorpayOrderId, orderId))
-        .run();
+        .where(eq(payments.razorpayOrderId, orderId));
 
-      tx.update(users)
+      await tx.update(users)
         .set({
           plan: 'paid',
           updatedAt: new Date().toISOString(),
         })
-        .where(eq(users.id, testUserId))
-        .run();
+        .where(eq(users.id, testUserId));
     });
 
     // Verify user is now paid
-    const updatedUser = db.select().from(users).where(eq(users.id, testUserId)).get();
+    const [updatedUser] = await db.select().from(users).where(eq(users.id, testUserId)).limit(1);
     expect(updatedUser?.plan).toBe('paid');
 
     // Step C: Verified that report is now completely unlocked
@@ -244,10 +234,10 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const resultRecord = db.select().from(results).where(eq(results.userId, testUserId)).get();
+    const [resultRecord] = await db.select().from(results).where(eq(results.userId, testUserId)).limit(1);
     expect(resultRecord).toBeDefined();
 
-    db.insert(parentShareLinks)
+    await db.insert(parentShareLinks)
       .values({
         id: crypto.randomUUID(),
         resultId: resultRecord!.id,
@@ -256,15 +246,14 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
         expiresAt,
         revokedAt: null,
         createdAt: now.toISOString(),
-      })
-      .run();
+      });
 
     // Verify retrieval by token hash
-    const link = db
+    const [link] = await db
       .select()
       .from(parentShareLinks)
       .where(eq(parentShareLinks.tokenHash, tokenHash))
-      .get();
+      .limit(1);
     expect(link).toBeDefined();
     expect(new Date(link!.expiresAt).getTime()).toBeGreaterThan(now.getTime());
   });
@@ -274,7 +263,7 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
     const futureDate = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days later
 
     // A. Schedule upcoming session with consultant
-    db.insert(sessions)
+    await db.insert(sessions)
       .values({
         id: crypto.randomUUID(),
         studentId: testUserId,
@@ -285,12 +274,11 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
         joinLink: 'https://meet.google.com/test-careerchecks-call',
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
-      })
-      .run();
+      });
 
     // B. Create and publish roadmap
     const roadmapId = crypto.randomUUID();
-    db.insert(roadmaps)
+    await db.insert(roadmaps)
       .values({
         id: roadmapId,
         studentId: testUserId,
@@ -300,10 +288,9 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
         publishedAt: now.toISOString(),
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
-      })
-      .run();
+      });
 
-    db.insert(roadmapMilestones)
+    await db.insert(roadmapMilestones)
       .values({
         id: crypto.randomUUID(),
         roadmapId,
@@ -315,10 +302,9 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
         status: 'pending',
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
-      })
-      .run();
+      });
 
-    db.insert(roadmapMilestones)
+    await db.insert(roadmapMilestones)
       .values({
         id: crypto.randomUUID(),
         roadmapId,
@@ -330,22 +316,20 @@ describe('Phase 3: Results, Payments & Dashboard End-to-End Suite', () => {
         status: 'pending',
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
-      })
-      .run();
+      });
 
     // Verify published roadmap in DB
-    const studentRoadmap = db
+    const [studentRoadmap] = await db
       .select()
       .from(roadmaps)
       .where(and(eq(roadmaps.studentId, testUserId), eq(roadmaps.isPublished, 1)))
-      .get();
+      .limit(1);
     expect(studentRoadmap).toBeDefined();
 
-    const milestones = db
+    const milestones = await db
       .select()
       .from(roadmapMilestones)
-      .where(eq(roadmapMilestones.roadmapId, roadmapId))
-      .all();
+      .where(eq(roadmapMilestones.roadmapId, roadmapId));
     expect(milestones.length).toBe(2);
     expect(milestones[0].title).toContain('CUET');
   });
