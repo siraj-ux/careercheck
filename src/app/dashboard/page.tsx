@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Compass,
   Calendar,
   Clock,
   Video,
@@ -23,6 +22,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { BookingModal } from '@/components/booking/BookingModal';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
 import { OfflineBanner } from '@/components/common/OfflineBanner';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 interface Milestone {
   id: string;
@@ -186,12 +186,11 @@ export default function StudentDashboardPage() {
       <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 h-16">
           <div className="flex items-center gap-3">
-            <Link href="/" className="font-bold text-zinc-950 text-sm tracking-tight flex items-center gap-2">
-              <Compass className="h-4 w-4 text-indigo-600" />
-              <span>CareerChecks</span>
-            </Link>
+            <BrandLogo href="/" size="sm" />
             <span className="text-zinc-300">/</span>
-            <span className="text-xs font-medium text-zinc-600">Student Portal</span>
+            <span className="text-xs font-semibold text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-full">
+              Student Portal
+            </span>
           </div>
 
           <div className="flex items-center gap-3">

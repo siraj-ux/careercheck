@@ -16,6 +16,7 @@ import { LandingHeader } from '@/components/landing/LandingHeader';
 import { ReportPreview } from '@/components/landing/ReportPreview';
 import { LandingFaq } from '@/components/landing/LandingFaq';
 import { TakeFreeTestCta } from '@/components/landing/TakeFreeTestCta';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 export default function LandingPage() {
   return (
@@ -37,7 +38,7 @@ export default function LandingPage() {
 
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-zinc-950 leading-[1.12]">
                   Find the course and college that fit{' '}
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-indigo-800">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#004C99] to-[#6ABF4E]">
                     you
                   </span>
                   .
@@ -147,20 +148,79 @@ export default function LandingPage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
               <div>
-                <div className="text-3xl sm:text-4xl font-extrabold text-indigo-600 font-mono">5,000+</div>
+                <div className="text-3xl sm:text-4xl font-extrabold text-[#004C99] font-mono">5,000+</div>
                 <div className="text-xs sm:text-sm font-medium text-zinc-600 mt-1">Indian Students Guided</div>
               </div>
               <div>
-                <div className="text-3xl sm:text-4xl font-extrabold text-indigo-600 font-mono">80+</div>
+                <div className="text-3xl sm:text-4xl font-extrabold text-[#004C99] font-mono">80+</div>
                 <div className="text-xs sm:text-sm font-medium text-zinc-600 mt-1">Verified Human Consultants</div>
               </div>
               <div>
-                <div className="text-3xl sm:text-4xl font-extrabold text-indigo-600 font-mono">4.8 / 5</div>
+                <div className="text-3xl sm:text-4xl font-extrabold text-[#004C99] font-mono">4.8 / 5</div>
                 <div className="text-xs sm:text-sm font-medium text-zinc-600 mt-1">Student & Parent Rating</div>
               </div>
               <div>
-                <div className="text-3xl sm:text-4xl font-extrabold text-indigo-600 font-mono">100%</div>
+                <div className="text-3xl sm:text-4xl font-extrabold text-[#004C99] font-mono">100%</div>
                 <div className="text-xs sm:text-sm font-medium text-zinc-600 mt-1">Data Never Sold Promise</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* BRAND GUIDELINES SIGNATURE BANNER (from Brand Guidelines Page 2, 5, 7) */}
+        <section className="relative overflow-hidden bg-gradient-to-r from-[#004C99] via-[#156E9D] to-[#6ABF4E] text-white py-12 md:py-16 shadow-lg">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+              {/* Left Column: Heading with arrow */}
+              <div className="text-center lg:text-left">
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white/90 mb-3 backdrop-blur-md">
+                  <span>Guidance & Clarity</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white flex items-center justify-center lg:justify-start gap-3">
+                  <span>We help you to learn better.</span>
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#004C99] shadow-xs">
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
+                </h2>
+                <p className="text-sm sm:text-base text-white/90 mt-2 max-w-xl leading-relaxed">
+                  Presenting the best learning and career assessment platform your child will ever need to fully invest in their learning journey.
+                </p>
+              </div>
+
+              {/* Right Column: Outline Cards from Page 7 */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 w-full lg:w-auto">
+                <Link
+                  href="/auth?redirect=/onboarding/profile"
+                  className="rounded-2xl border-2 border-white/40 bg-white/10 backdrop-blur-md px-5 py-4 text-center hover:bg-white/20 hover:border-white transition-all hover:scale-102 shadow-xs group"
+                >
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-white/80">Stream & Exam</div>
+                  <div className="text-base font-extrabold text-white mt-1 group-hover:text-emerald-200 transition-colors">
+                    Academic Courses
+                  </div>
+                  <div className="text-xs text-white/70 mt-1">CUET, JEE, NEET, Law</div>
+                </Link>
+
+                <Link
+                  href="/auth?redirect=/onboarding/profile"
+                  className="rounded-2xl border-2 border-white/40 bg-white/10 backdrop-blur-md px-5 py-4 text-center hover:bg-white/20 hover:border-white transition-all hover:scale-102 shadow-xs group"
+                >
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-white/80">New-Age Domains</div>
+                  <div className="text-base font-extrabold text-white mt-1 group-hover:text-emerald-200 transition-colors">
+                    NON - Academic Courses
+                  </div>
+                  <div className="text-xs text-white/70 mt-1">Design, Media, Tech, AI</div>
+                </Link>
+
+                <Link
+                  href="/consultant"
+                  className="rounded-2xl border-2 border-white/40 bg-white/10 backdrop-blur-md px-5 py-4 text-center hover:bg-white/20 hover:border-white transition-all hover:scale-102 shadow-xs group"
+                >
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-white/80">Verified Mentors</div>
+                  <div className="text-base font-extrabold text-white mt-1 group-hover:text-emerald-200 transition-colors">
+                    Become a Mentor
+                  </div>
+                  <div className="text-xs text-white/70 mt-1">Consultant Portal</div>
+                </Link>
               </div>
             </div>
           </div>
@@ -633,12 +693,10 @@ export default function LandingPage() {
       {/* FOOTER */}
       <footer className="border-t border-zinc-200 bg-white py-12 text-xs text-zinc-600">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
-              CC
-            </div>
-            <span className="font-bold text-zinc-900 text-sm">CareerChecks</span>
-            <span className="text-zinc-600">· Made with care for Indian students</span>
+          <div className="flex items-center gap-3">
+            <BrandLogo size="sm" href="/" />
+            <span className="text-zinc-300">|</span>
+            <span className="text-zinc-500 font-medium">www.careerchecks.com</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-6">

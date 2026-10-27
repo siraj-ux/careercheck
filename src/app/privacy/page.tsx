@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
-import { Compass, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { ShieldCheck, ArrowLeft } from 'lucide-react';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 export const metadata = {
   title: 'Privacy Policy | CareerChecks',
@@ -12,10 +13,7 @@ export default function PrivacyPolicyPage() {
     <div className="min-h-screen bg-zinc-50 pb-20">
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 sm:px-6 h-16">
-          <Link href="/" className="font-bold text-zinc-950 text-sm tracking-tight flex items-center gap-2">
-            <Compass className="h-4 w-4 text-indigo-600" />
-            <span>CareerChecks</span>
-          </Link>
+          <BrandLogo href="/" size="sm" />
           <Link href="/" className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-600 hover:text-zinc-950">
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Back to Home</span>

@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Compass,
   Check,
   X,
   Sparkles,
@@ -15,6 +14,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { PRICING_PLANS, REFUND_POLICY } from '@/config/pricing';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 export default function PricingPage() {
   const router = useRouter();
@@ -84,10 +84,7 @@ export default function PricingPage() {
       {/* Header */}
       <header className="border-b border-zinc-200/80 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6 h-16">
-          <Link href="/" className="font-bold text-zinc-950 text-sm tracking-tight flex items-center gap-2">
-            <Compass className="h-4 w-4 text-indigo-600" />
-            <span>CareerChecks</span>
-          </Link>
+          <BrandLogo href="/" size="sm" />
           <div className="flex items-center gap-3 text-xs">
             <Link href="/report" className="font-semibold text-zinc-600 hover:text-zinc-900">
               View My Report

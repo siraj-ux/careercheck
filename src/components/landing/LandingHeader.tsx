@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Compass,
   Menu,
   X,
   ArrowRight,
@@ -12,6 +11,7 @@ import {
   LogOut,
   LogIn,
 } from 'lucide-react';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 interface SessionUser {
   id: string;
@@ -61,22 +61,10 @@ export function LandingHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 h-16">
+    <header className="sticky top-0 z-40 w-full border-b border-zinc-200/80 bg-white/95 backdrop-blur-md">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 h-18">
         {/* Brand */}
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs transition-transform group-hover:scale-105">
-            <Compass className="h-5 w-5" />
-          </div>
-          <div>
-            <span className="text-lg font-bold tracking-tight text-zinc-900 group-hover:text-indigo-600 transition-colors">
-              CareerChecks
-            </span>
-            <span className="hidden sm:inline-block ml-2 text-xs font-medium text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-full">
-              Student Guidance
-            </span>
-          </div>
-        </Link>
+        <BrandLogo href="/" size="md" />
 
         {/* Desktop Navigation Links */}
         <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-zinc-600">

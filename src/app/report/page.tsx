@@ -4,7 +4,6 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Compass,
   Share2,
   Lock,
   Sparkles,
@@ -20,6 +19,7 @@ import { CareerCards } from '@/components/report/CareerCards';
 import { CollegeCards } from '@/components/report/CollegeCards';
 import { UnlockCard } from '@/components/report/UnlockCard';
 import { ShareParentModal } from '@/components/report/ShareParentModal';
+import { BrandLogo } from '@/components/common/BrandLogo';
 import { ReportPayload } from '@/server/scoring/service';
 import { RiasecLetter } from '@/config/scoring';
 
@@ -170,12 +170,11 @@ function ReportContent() {
       <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 h-16">
           <div className="flex items-center gap-3">
-            <Link href="/" className="font-bold text-zinc-950 text-sm tracking-tight flex items-center gap-2">
-              <Compass className="h-4 w-4 text-indigo-600" />
-              <span>CareerChecks</span>
-            </Link>
+            <BrandLogo href="/" size="sm" />
             <span className="text-zinc-300">/</span>
-            <span className="text-xs font-medium text-zinc-600">Assessment Report</span>
+            <span className="text-xs font-semibold text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-full">
+              Assessment Report
+            </span>
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
               isPaid ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
             }`}>

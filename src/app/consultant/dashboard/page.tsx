@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Compass,
   Calendar,
   Video,
   Users,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { OfflineBanner } from '@/components/common/OfflineBanner';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 interface TodaySession {
   sessionId: string;
@@ -197,12 +197,9 @@ export default function ConsultantDashboardPage() {
       <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 h-16">
           <div className="flex items-center gap-3">
-            <Link href="/" className="font-bold text-zinc-950 text-sm tracking-tight flex items-center gap-2">
-              <Compass className="h-4 w-4 text-indigo-600" />
-              <span>CareerChecks</span>
-            </Link>
+            <BrandLogo href="/" size="sm" />
             <span className="text-zinc-300">/</span>
-            <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full">
+            <span className="text-xs font-bold text-[#004C99] bg-[#EBF3FB] px-2.5 py-0.5 rounded-full">
               Consultant Workspace
             </span>
           </div>

@@ -11,6 +11,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { SECTION_META, SectionType, SECTION_ORDER_UG, SECTION_ORDER_PG } from '@/lib/constants/sections';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 function SectionBreakContent() {
   const router = useRouter();
@@ -97,7 +98,7 @@ function SectionBreakContent() {
       <header className="border-b border-zinc-200/80 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 sm:px-6 h-16">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-zinc-900 text-sm">CareerChecks</span>
+            <BrandLogo href="/" size="sm" />
             <span className="text-xs text-zinc-600 font-medium">· Section Break</span>
           </div>
 

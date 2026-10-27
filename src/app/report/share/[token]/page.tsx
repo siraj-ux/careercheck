@@ -3,7 +3,6 @@
 import React, { useState, useEffect, use, Suspense } from 'react';
 import Link from 'next/link';
 import {
-  Compass,
   Clock,
   ShieldCheck,
   AlertTriangle,
@@ -13,6 +12,7 @@ import { AptitudeBars } from '@/components/report/AptitudeBars';
 import { PersonalitySpectrums } from '@/components/report/PersonalitySpectrums';
 import { CareerCards } from '@/components/report/CareerCards';
 import { CollegeCards } from '@/components/report/CollegeCards';
+import { BrandLogo } from '@/components/common/BrandLogo';
 import { ReportPayload } from '@/server/scoring/service';
 import { RiasecLetter } from '@/config/scoring';
 
@@ -110,8 +110,7 @@ function SharedReportContent({ token }: { token: string }) {
       <header className="border-b border-zinc-200/80 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 sm:px-6 h-16">
           <div className="flex items-center gap-2">
-            <Compass className="h-4 w-4 text-indigo-600" />
-            <span className="font-bold text-zinc-950 text-sm">CareerChecks</span>
+            <BrandLogo href="/" size="sm" />
             <span className="text-xs text-zinc-600 font-medium">· Student Results</span>
           </div>
 

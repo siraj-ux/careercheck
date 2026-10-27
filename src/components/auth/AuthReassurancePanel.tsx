@@ -1,19 +1,11 @@
-import Link from 'next/link';
-import { Compass, ShieldCheck, Clock, Lock, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Clock, Lock, CheckCircle2 } from 'lucide-react';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 export function AuthReassurancePanel() {
   return (
-    <div className="hidden lg:flex lg:col-span-5 flex-col justify-between bg-gradient-to-br from-indigo-900 via-indigo-800 to-indigo-950 p-12 text-white rounded-3xl shadow-xl min-h-[640px]">
+    <div className="hidden lg:flex lg:col-span-5 flex-col justify-between bg-gradient-to-br from-[#004C99] via-[#105F8E] to-[#6ABF4E] p-12 text-white rounded-3xl shadow-xl min-h-[640px]">
       <div>
-        <Link href="/" className="inline-flex items-center gap-2.5 group">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white backdrop-blur-md border border-white/20 transition-transform group-hover:scale-105">
-            <Compass className="h-5 w-5" />
-          </div>
-          <div>
-            <span className="text-xl font-bold tracking-tight text-white">CareerChecks</span>
-            <span className="block text-[11px] text-indigo-200 font-medium">India&apos;s Student Guidance</span>
-          </div>
-        </Link>
+        <BrandLogo href="/" variant="white" size="lg" />
 
         <div className="mt-14 space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-indigo-200 border border-white/15">

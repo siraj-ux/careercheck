@@ -38,7 +38,7 @@ export function TakeFreeTestCta({
         href={targetHref}
         className={
           className ||
-          'w-full inline-flex items-center justify-center gap-2 rounded-full border border-zinc-300 bg-white px-6 py-3.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 transition-colors'
+          'w-full inline-flex items-center justify-center gap-2 rounded-full border-2 border-[#004C99] bg-white px-6 py-3.5 text-sm font-bold text-[#004C99] hover:bg-[#EBF3FB] transition-colors shadow-2xs'
         }
       >
         {label}
@@ -51,7 +51,7 @@ export function TakeFreeTestCta({
       href={targetHref}
       className={
         className ||
-        'w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-full bg-indigo-600 px-8 py-4 text-base font-semibold text-white shadow-sm hover:bg-indigo-700 active:scale-98 transition-all'
+        'w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-full bg-[#6ABF4E] hover:bg-[#54A03A] px-8 py-4 text-base font-bold text-white shadow-md hover:shadow-lg active:scale-98 transition-all'
       }
     >
       <span>{label}</span>
