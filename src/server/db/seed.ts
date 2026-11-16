@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { eq } from 'drizzle-orm';
 import { db } from './client';
 import { questions, results, testSessions } from './schema/tests';
@@ -31,104 +33,113 @@ export async function seedDatabase() {
 
   // Check if questions are already seeded
   const existingQuestions = await db.select({ id: questions.id }).from(questions).limit(1);
-  if (existingQuestions.length > 0) {
-    console.log('✅ Question bank already seeded, skipping question insert.');
-  } else {
-    const questionBatch: (typeof questions.$inferInsert)[] = [];
 
   // A. Interests (RIASEC) - 60 items (10 per letter)
+  // Simplified in clear, everyday English easily understandable for South Indian school and college students
   const riasecItems: { letter: 'R' | 'I' | 'A' | 'S' | 'E' | 'C'; items: string[] }[] = [
     {
-      letter: 'R', // Realistic
+      letter: 'R', // Realistic - Practical & Hands-on
       items: [
-        'I like assembling or repairing physical machines, gadgets, or vehicles.',
-        'I enjoy working outdoors with nature, plants, or physical structures.',
-        'I find satisfaction in hands-on building or working with physical tools.',
-        'I prefer concrete physical tasks over discussing abstract theories.',
-        'I like operating diagnostic electronic or audio-visual equipment.',
-        'I enjoy precision crafting, 3D modeling, or hardware troubleshooting.',
-        'I would enjoy designing architectural physical prototypes or models.',
-        'I prefer physical lab experiments to reading research summaries.',
-        'I like understanding how internal mechanical gears and motors function.',
-        'I am comfortable working with complex technical instruments.',
+        'I like fixing or repairing gadgets, bikes, or home appliances.',
+        'I enjoy working outdoors in nature, farming, or gardening.',
+        'I like making things with my own hands using tools like hammers, screwdrivers, or drills.',
+        'I prefer doing practical, hands-on work rather than just listening to theory classes.',
+        'I like operating electronic gadgets, sound systems, or cameras.',
+        'I enjoy assembling computer parts or doing craft work with precision.',
+        'I would like building scale models of houses, bridges, or vehicles.',
+        'I enjoy doing science experiments in the lab more than reading textbooks.',
+        'I like finding out how engines, motors, and bicycle gears work.',
+        'I feel comfortable using machines and technical equipment in a workshop or laboratory.',
       ],
     },
     {
-      letter: 'I', // Investigative
+      letter: 'I', // Investigative - Science, Logic & Analysis
       items: [
-        'I enjoy solving complex data puzzles or scientific mysteries.',
-        'I like reading research studies and analyzing why things occur.',
-        'I prefer designing a logical experiment rather than following routine tasks.',
-        'I enjoy programming algorithms to automate complex logic.',
-        'I like diving deep into mathematical or statistical models.',
-        'I constantly ask "why" and investigate root causes of systemic problems.',
-        'I prefer evaluating objective evidence over trusting gut instincts.',
-        'I enjoy exploring hypotheses in biology, computing, or economics.',
-        'I like diagnosing hidden software bugs or logical paradoxes.',
-        'I find comfort in systematic inquiry and structured research.',
+        'I enjoy solving tricky math problems or science puzzles.',
+        'I like finding out why things happen by searching for facts and scientific explanations.',
+        'I like testing new ideas through experiments instead of just memorizing answers.',
+        'I enjoy writing computer code or solving problems using logic.',
+        'I like working with numbers, graphs, and statistics to understand trends.',
+        'I always ask "why" and try to find the real root cause behind any problem.',
+        'I prefer checking real evidence and facts before believing what someone says.',
+        'I enjoy learning how the human body, nature, or computer networks function.',
+        'I like finding errors or bugs in a computer program or a math calculation.',
+        'I enjoy doing research and reading detailed articles about science and technology.',
       ],
     },
     {
-      letter: 'A', // Artistic
+      letter: 'A', // Artistic - Creative, Design & Media
       items: [
-        'I enjoy expressing ideas through visual art, UI design, or illustration.',
-        'I like writing stories, scripts, essays, or persuasive narratives.',
-        'I prefer open-ended creative freedom over rigid corporate checklists.',
-        'I notice nuances in typography, color harmony, and digital aesthetics.',
-        'I enjoy composing music, sound design, or video editing.',
-        'I like coming up with unconventional concepts that break traditional norms.',
-        'I find satisfaction in creating memorable brand identities or artworks.',
-        'I like brainstorming dramatic, theatrical, or creative storytelling hooks.',
-        'I am drawn to exhibitions, cinema, and modern design movements.',
-        'I express my individuality through creative personal projects.',
+        'I enjoy drawing, sketching, painting, or digital graphic design.',
+        'I like writing stories, poems, articles, or scripts for videos.',
+        'I like doing work in my own creative way instead of following strict rules.',
+        'I easily notice good color combinations, nice fonts, and attractive designs.',
+        'I enjoy playing musical instruments, singing, or editing videos and reels.',
+        'I like coming up with unique, creative ideas that are different from everyone else.',
+        'I enjoy designing logos, posters, banners, or decorating a room nicely.',
+        'I like thinking of exciting scenes or stories for movies, plays, or short films.',
+        'I love watching good cinema, photography, or visiting art and culture exhibitions.',
+        'I spend my free time working on creative hobbies like music, dance, drawing, or photography.',
       ],
     },
     {
-      letter: 'S', // Social
+      letter: 'S', // Social - Teaching, Helping & Community
       items: [
-        'I feel energized when helping others solve personal or academic hurdles.',
-        'I enjoy mentoring juniors, explaining concepts, or teaching groups.',
-        'I am naturally empathetic and listen patiently to others\' struggles.',
-        'I like mediating conflicts between team members to find harmony.',
-        'I would find it rewarding to provide counseling or emotional guidance.',
-        'I enjoy facilitating group workshops or collaborative sessions.',
-        'I care deeply about social justice, community welfare, and education.',
-        'I prefer working in warm, people-centric team environments.',
-        'I enjoy understanding psychological motivations and human behaviour.',
-        'I feel fulfilled when I see someone succeed because of my support.',
+        'I feel happy helping friends or classmates when they have difficulty with studies.',
+        'I enjoy teaching or explaining difficult lessons to juniors or classmates.',
+        'I listen patiently when friends want to talk about their personal problems.',
+        'When friends have a fight or misunderstanding, I try to help them solve it peacefully.',
+        'I would like guiding and giving advice to people who are feeling stressed or confused.',
+        'I enjoy organizing group study sessions, club activities, or team discussions.',
+        'I care deeply about helping poor families, social welfare, and good education for all.',
+        'I prefer working closely in a friendly team rather than working alone.',
+        'I like observing why different people think and behave the way they do.',
+        'I feel proud and satisfied when someone succeeds because of my help.',
       ],
     },
     {
-      letter: 'E', // Enterprising
+      letter: 'E', // Enterprising - Leadership, Business & Public Speaking
       items: [
-        'I enjoy pitching ideas, negotiating deals, or leading projects.',
-        'I like taking calculated business risks to launch new ventures.',
-        'I am confident in speaking publicly and persuading an audience.',
-        'I enjoy organizing student festivals, clubs, or business case competitions.',
-        'I like analyzing market opportunities and consumer purchase habits.',
-        'I naturally step forward to take charge when a group lacks leadership.',
-        'I am motivated by tangible growth metrics, revenue, and milestones.',
-        'I enjoy building a strong professional network and pitching partners.',
-        'I like developing go-to-market strategies for products or services.',
-        'I thrive in fast-paced environments with high stakes and autonomy.',
+        'I enjoy leading a team, convincing people, and presenting new ideas.',
+        'I would like to start my own business, startup, or company someday.',
+        'I feel confident speaking on stage or giving a speech to a crowd.',
+        'I enjoy organizing college fests, school programs, or sports tournaments.',
+        'I like noticing which products sell well in shops and why customers buy them.',
+        'When a group project has no clear leader, I naturally step forward to guide everyone.',
+        'I am motivated by earning good profit, achieving high targets, and winning competitions.',
+        'I enjoy meeting new people, making useful contacts, and networking.',
+        'I like planning how to advertise and sell a product so that many people buy it.',
+        'I enjoy fast-moving, competitive work where I have the freedom to make quick decisions.',
       ],
     },
     {
-      letter: 'C', // Conventional
+      letter: 'C', // Conventional - Organized, Accounts & Accuracy
       items: [
-        'I enjoy organizing spreadsheets, tracking budgets, and cataloging data.',
-        'I appreciate clear standard operating procedures and neat workflows.',
-        'I double-check details to ensure zero errors in official documents.',
-        'I like maintaining structured financial accounts or inventory logs.',
-        'I feel comfortable following established regulatory and compliance guidelines.',
-        'I prefer structured daily routines over unpredictable chaos.',
-        'I enjoy systematizing messy folders, databases, and schedules.',
-        'I like verifying calculations and proofreading fine print.',
-        'I take pride in high accuracy, punctuality, and methodical order.',
-        'I enjoy managing structured operations or database records.',
+        'I enjoy maintaining neat tables, tracking expenses, and budgeting pocket money.',
+        'I prefer having clear step-by-step instructions before starting any task.',
+        'I double-check my homework or test papers to ensure there are zero mistakes.',
+        'I like keeping daily accounts, bill receipts, or records neatly organized.',
+        'I feel comfortable following official rules and school or college regulations.',
+        'I prefer having a fixed daily study timetable rather than unexpected changes.',
+        'I like organizing messy computer folders, files, or bookshelves neatly.',
+        'I like re-checking totals, calculations, and spelling to make sure everything is accurate.',
+        'I take pride in submitting my work on time, being punctual, and keeping things neat.',
+        'I enjoy maintaining official records, registers, or files safely updated.',
       ],
     },
   ];
+
+  if (existingQuestions.length > 0) {
+    console.log('✅ Question bank already seeded. Synchronizing simplified interest question stems...');
+    for (const group of riasecItems) {
+      for (let i = 0; i < group.items.length; i++) {
+        const qId = `q-int-${group.letter.toLowerCase()}-${i + 1}`;
+        await db.update(questions).set({ stemText: group.items[i] }).where(eq(questions.id, qId));
+      }
+    }
+    console.log('✅ Successfully updated all 60 interest question stems to simple English.');
+  } else {
+    const questionBatch: (typeof questions.$inferInsert)[] = [];
 
   for (const group of riasecItems) {
     for (let i = 0; i < group.items.length; i++) {
@@ -652,93 +663,16 @@ export async function seedDatabase() {
     console.log(`✅ Seeded ${questionBatch.length} psychometric questions.`);
   }
 
-  // 3. Seed Sample Colleges (~10 representative Indian colleges)
-  console.log('Seeding sample colleges...');
+  // 3. Seed Courses & Colleges
+  console.log('Seeding courses & colleges...');
   const existingColleges = await db.select({ id: colleges.id }).from(colleges).limit(1);
   if (existingColleges.length === 0) {
-    const sampleColleges = [
-    {
-      id: 'col-iit-bombay',
-      name: 'IIT Bombay - Industrial Design Centre',
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      type: 'Government',
-      annualFees: 220000,
-      cutoffPercent: 95,
-      examsJson: JSON.stringify(['UCEED', 'CEED']),
-      coursesJson: JSON.stringify(['B.Des', 'M.Des']),
-      level: 'both' as const,
-      createdAt: now,
-    },
-    {
-      id: 'col-nid-ahmedabad',
-      name: 'National Institute of Design (NID)',
-      city: 'Ahmedabad',
-      state: 'Gujarat',
-      type: 'Government',
-      annualFees: 350000,
-      cutoffPercent: 92,
-      examsJson: JSON.stringify(['NID DAT']),
-      coursesJson: JSON.stringify(['B.Des', 'M.Des Communication Design']),
-      level: 'both' as const,
-      createdAt: now,
-    },
-    {
-      id: 'col-bits-pilani',
-      name: 'BITS Pilani',
-      city: 'Pilani',
-      state: 'Rajasthan',
-      type: 'Private',
-      annualFees: 520000,
-      cutoffPercent: 90,
-      examsJson: JSON.stringify(['BITSAT']),
-      coursesJson: JSON.stringify(['B.E. Computer Science', 'M.Sc Data Science']),
-      level: 'both' as const,
-      createdAt: now,
-    },
-    {
-      id: 'col-srcc-delhi',
-      name: 'Shri Ram College of Commerce (SRCC)',
-      city: 'Delhi',
-      state: 'Delhi',
-      type: 'Government',
-      annualFees: 45000,
-      cutoffPercent: 98,
-      examsJson: JSON.stringify(['CUET']),
-      coursesJson: JSON.stringify(['B.Com (Hons)', 'B.A. Economics (Hons)']),
-      level: 'UG' as const,
-      createdAt: now,
-    },
-    {
-      id: 'col-symbiosis-pune',
-      name: 'Symbiosis Institute of Design',
-      city: 'Pune',
-      state: 'Maharashtra',
-      type: 'Private',
-      annualFees: 420000,
-      cutoffPercent: 82,
-      examsJson: JSON.stringify(['SEED']),
-      coursesJson: JSON.stringify(['B.Des User Experience Design']),
-      level: 'UG' as const,
-      createdAt: now,
-    },
-    {
-      id: 'col-ashoka-univ',
-      name: 'Ashoka University',
-      city: 'Sonipat',
-      state: 'Haryana',
-      type: 'Private',
-      annualFees: 950000,
-      cutoffPercent: 88,
-      examsJson: JSON.stringify(['Ashoka Aptitude Assessment']),
-      coursesJson: JSON.stringify(['B.A./B.Sc Liberal Arts', 'Computer Science']),
-      level: 'UG' as const,
-      createdAt: now,
-    },
-  ];
-
-    for (const col of sampleColleges) {
-      await db.insert(colleges).values(col);
+    const seedSqlPath = path.resolve(process.cwd(), 'src/server/db/data/courses_colleges_seed.sql');
+    if (fs.existsSync(seedSqlPath)) {
+      const sqlContent = fs.readFileSync(seedSqlPath, 'utf-8');
+      const { pool } = await import('./client');
+      await pool.query(sqlContent);
+      console.log('Seeded courses and colleges from seed SQL.');
     }
   }
 
@@ -785,33 +719,6 @@ export async function seedDatabase() {
       specialisationsJson: JSON.stringify(['Design', 'Media', 'Technology']),
       rating: 4.9,
       studentCount: 1,
-      isActive: 1,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    // Consultant Rajesh
-    await db.insert(users).values({
-      id: 'usr-rajesh-demo',
-      phone: '+919888888882',
-      role: 'consultant',
-      name: 'Dr. Rajesh Kumar',
-      level: null,
-      plan: 'paid',
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await db.insert(consultants).values({
-      id: 'cns-rajesh',
-      userId: 'usr-rajesh-demo',
-      title: 'Principal Engineering & Management Counselor',
-      credentialsJson: JSON.stringify(['PhD IIT Delhi', '15+ Years Counseling Experience', 'Certified Career Coach']),
-      bio: 'Guiding STEM aspirants into premier engineering colleges and emerging technical careers.',
-      languagesJson: JSON.stringify(['English', 'Hindi', 'Marathi']),
-      specialisationsJson: JSON.stringify(['Engineering', 'Technology', 'Management']),
-      rating: 4.8,
-      studentCount: 0,
       isActive: 1,
       createdAt: now,
       updatedAt: now,

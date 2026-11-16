@@ -8,12 +8,12 @@ export const colleges = pgTable(
     name: text('name').notNull(),
     city: text('city').notNull(),
     state: text('state').notNull(),
-    type: text('type').notNull(), // 'Govt', 'Private', etc.
-    annualFees: integer('annual_fees').notNull(), // INR
-    cutoffPercent: real('cutoff_percent').notNull(),
-    examsJson: text('exams_json').notNull(), // JSON: string[]
-    coursesJson: text('courses_json').notNull(), // JSON: string[]
-    level: text('level', { enum: ['UG', 'PG', 'both'] }).notNull().default('both'),
+    type: text('type'), // 'Govt', 'Private', etc. (can be null until updated by admin)
+    annualFees: integer('annual_fees'), // INR (can be null until updated by admin)
+    cutoffPercent: real('cutoff_percent'), // (can be null until updated by admin)
+    examsJson: text('exams_json'), // JSON: string[] (can be null until updated by admin)
+    coursesJson: text('courses_json'), // JSON: string[] (can be null until updated by admin)
+    level: text('level', { enum: ['UG', 'PG', 'both'] }).default('both'),
     createdAt: text('created_at').notNull(),
   },
   (table) => [

@@ -116,17 +116,40 @@ export default function StudentDashboardPage() {
         return res.json();
       })
       .then((resData) => {
-        if (resData && resData.success) {
-          setData(resData);
+        if (!resData) return;
+        if (resData.redirect) {
+          router.replace(resData.redirect);
+          return;
         }
-        setLoading(false);
+        if (resData.success) {
+          setData(resData);
+          setLoading(false);
+        } else {
+          setLoading(false);
+        }
       })
       .catch(() => setLoading(false));
   }, [router]);
 
   useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+    // Quick session role check to preempt student dashboard render for admins/consultants
+    fetch('/api/auth/session')
+      .then((res) => res.json())
+      .then((sData) => {
+        if (sData?.success && sData.user) {
+          if (sData.user.role === 'admin') {
+            router.replace('/admin');
+            return;
+          }
+          if (sData.user.role === 'consultant') {
+            router.replace('/consultant');
+            return;
+          }
+        }
+        fetchDashboard();
+      })
+      .catch(() => fetchDashboard());
+  }, [fetchDashboard, router]);
 
   if (loading) {
     return (
@@ -566,7 +589,7 @@ export default function StudentDashboardPage() {
                       className="rounded-xl border border-zinc-100 bg-zinc-50 p-2.5 text-xs space-y-0.5"
                     >
                       <div className="font-bold text-zinc-900 truncate">{col.name}</div>
-                      <div className="text-[11px] text-zinc-600">{col.city} · Cutoff {col.cutoffPercent}%</div>
+                      <div className="text-[11px] text-zinc-600">{col.city}{col.cutoffPercent != null ? ` · Cutoff ${col.cutoffPercent}%` : ''}</div>
                     </div>
                   ))}
                 </div>

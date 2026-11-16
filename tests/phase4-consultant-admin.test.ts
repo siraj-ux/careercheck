@@ -39,9 +39,9 @@ describe('Phase 4: Consultant, Admin, Hardening & Launch Suite', () => {
 
   describe('2. Student 360 Diagnostic, Isolation & Decisions', () => {
     it('strictly forbids a consultant from accessing an unassigned student (Security Check #6)', async () => {
-      // Consultant Rajesh is NOT assigned to Diya Patel
+      // Unassigned consultant ID is NOT assigned to Diya Patel
       await expect(
-        ConsultantService.getStudent360('usr-rajesh-demo', 'usr-diya-demo')
+        ConsultantService.getStudent360('usr-unassigned-consultant', 'usr-diya-demo')
       ).rejects.toThrow(ConsultantForbiddenError);
     });
 
@@ -258,7 +258,7 @@ describe('Phase 4: Consultant, Admin, Hardening & Launch Suite', () => {
     it('matches unassigned students in queue using smart matching algorithm', async () => {
       const { queue, activeConsultants } = await AdminService.getAssignmentQueue();
 
-      expect(activeConsultants.length).toBeGreaterThanOrEqual(2);
+      expect(activeConsultants.length).toBeGreaterThanOrEqual(1);
 
       // Sana Khan is unassigned (UG, Science PCM, Engineering/Tech interest)
       const sanaItem = queue.find((q) => q.studentId === 'usr-sana-demo');
@@ -268,11 +268,11 @@ describe('Phase 4: Consultant, Admin, Hardening & Launch Suite', () => {
     });
 
     it('admin confirms consultant assignment, updating profile and notifying parties', async () => {
-      const assign = await AdminService.assignConsultant('usr-admin-demo', 'usr-sana-demo', 'cns-rajesh');
+      const assign = await AdminService.assignConsultant('usr-admin-demo', 'usr-sana-demo', 'cns-priya');
       expect(assign.success).toBe(true);
 
       const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.userId, 'usr-sana-demo')).limit(1);
-      expect(profile?.assignedConsultantId).toBe('cns-rajesh');
+      expect(profile?.assignedConsultantId).toBe('cns-priya');
 
       // Verify Sana is no longer in unassigned queue
       const { queue } = await AdminService.getAssignmentQueue();

@@ -34,7 +34,8 @@ export function CollegeCards({ colleges }: CollegeCardsProps) {
 
   const currentList: MatchedCollege[] = colleges[activeTab] || [];
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | null | undefined) => {
+    if (amount == null) return 'Fees not set';
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
@@ -120,8 +121,14 @@ export function CollegeCards({ colleges }: CollegeCardsProps) {
                 </span>
                 <span>·</span>
                 <span className="flex items-center gap-1 font-mono">
-                  <IndianRupee className="h-3 w-3 text-zinc-600" />
-                  <span>{formatCurrency(col.annualFees)} / yr</span>
+                  {col.annualFees != null ? (
+                    <>
+                      <IndianRupee className="h-3 w-3 text-zinc-600" />
+                      <span>{formatCurrency(col.annualFees)} / yr</span>
+                    </>
+                  ) : (
+                    <span className="text-zinc-500 font-sans text-xs italic">Annual fee not set</span>
+                  )}
                 </span>
               </div>
 
@@ -143,7 +150,9 @@ export function CollegeCards({ colleges }: CollegeCardsProps) {
               {/* Cutoff requirement */}
               <div className="flex items-center justify-between pt-2 border-t border-zinc-100 text-[11px]">
                 <span className="text-zinc-600">Estimated admission cutoff:</span>
-                <span className="font-mono font-bold text-indigo-600">{col.cutoffPercent}%</span>
+                <span className="font-mono font-bold text-indigo-600">
+                  {col.cutoffPercent != null ? `${col.cutoffPercent}%` : 'TBD'}
+                </span>
               </div>
             </div>
           ))}

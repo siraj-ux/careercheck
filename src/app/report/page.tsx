@@ -17,11 +17,13 @@ import { AptitudeBars } from '@/components/report/AptitudeBars';
 import { PersonalitySpectrums } from '@/components/report/PersonalitySpectrums';
 import { CareerCards } from '@/components/report/CareerCards';
 import { CollegeCards } from '@/components/report/CollegeCards';
+import { ConsultantCollegeNotice } from '@/components/report/ConsultantCollegeNotice';
 import { UnlockCard } from '@/components/report/UnlockCard';
 import { ShareParentModal } from '@/components/report/ShareParentModal';
 import { BrandLogo } from '@/components/common/BrandLogo';
 import { ReportPayload } from '@/server/scoring/service';
 import { RiasecLetter } from '@/config/scoring';
+import { FEATURES } from '@/config/features';
 
 function ReportContent() {
   const router = useRouter();
@@ -153,7 +155,13 @@ function ReportContent() {
     { id: 'aptitude', label: 'Aptitude Sub-Scores', locked: false },
     { id: 'personality', label: 'Personality Spectrums', locked: !isPaid },
     { id: 'careers', label: 'Matched Careers', locked: !isPaid },
-    { id: 'colleges', label: 'Colleges (Safe/Target/Reach)', locked: !isPaid },
+    {
+      id: 'colleges',
+      label: FEATURES.SHOW_COLLEGES_ON_REPORT
+        ? 'Colleges (Safe/Target/Reach)'
+        : 'Colleges (Consultant Curated)',
+      locked: !isPaid,
+    },
   ];
 
   const scrollToAnchor = (id: string) => {
@@ -346,12 +354,14 @@ function ReportContent() {
                   </section>
                 )}
 
-                {/* Section 5: Matched Colleges */}
-                {reportData.colleges && (
-                  <section id="colleges" className="scroll-mt-24 space-y-4">
+                {/* Section 5: Colleges (Hidden by default; consultant will share colleges) */}
+                <section id="colleges" className="scroll-mt-24 space-y-4">
+                  {FEATURES.SHOW_COLLEGES_ON_REPORT && reportData.colleges ? (
                     <CollegeCards colleges={reportData.colleges} />
-                  </section>
-                )}
+                  ) : (
+                    <ConsultantCollegeNotice />
+                  )}
+                </section>
               </>
             )}
           </main>

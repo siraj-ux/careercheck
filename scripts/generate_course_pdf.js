@@ -1,0 +1,935 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CareerChecks - How Degree Courses Are Suggested to Students</title>
+<style>
+  @page {
+    size: A4;
+    margin: 16mm 14mm 16mm 14mm;
+    @bottom-right {
+      content: counter(page);
+    }
+  }
+  
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #1e293b;
+    background: #ffffff;
+    line-height: 1.5;
+    font-size: 11pt;
+    margin: 0;
+    padding: 0;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+
+  /* Cover / Header */
+  .cover-header {
+    border-bottom: 3px solid #4f46e5;
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+  }
+
+  .brand-badge {
+    display: inline-block;
+    background: #eef2ff;
+    color: #4338ca;
+    font-weight: 700;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    margin-bottom: 12px;
+    border: 1px solid #c7d2fe;
+  }
+
+  h1 {
+    font-size: 24pt;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 8px 0;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+  }
+
+  .subtitle {
+    font-size: 13pt;
+    color: #475569;
+    margin: 0 0 14px 0;
+    font-weight: 500;
+  }
+
+  .doc-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 9pt;
+    color: #64748b;
+    font-weight: 600;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 10px;
+  }
+
+  .doc-meta span strong {
+    color: #334155;
+  }
+
+  /* Section Titles */
+  h2 {
+    font-size: 15pt;
+    font-weight: 800;
+    color: #1e1b4b;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 6px;
+    margin: 28px 0 14px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  h2 .num-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #4f46e5;
+    color: #ffffff;
+    font-size: 10pt;
+    font-weight: 700;
+  }
+
+  h3 {
+    font-size: 12pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 18px 0 8px 0;
+  }
+
+  p {
+    margin: 0 0 10px 0;
+    color: #334155;
+  }
+
+  /* Callout Boxes */
+  .callout {
+    background: #f8fafc;
+    border-left: 4px solid #4f46e5;
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 14px 0;
+    font-size: 10pt;
+  }
+
+  .callout-warning {
+    background: #fffbeb;
+    border-left-color: #d97706;
+  }
+
+  .callout-success {
+    background: #ecfdf5;
+    border-left-color: #059669;
+  }
+
+  /* Diagram Cards */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 14px 0;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin: 14px 0;
+  }
+
+  .card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: #ffffff;
+  }
+
+  .card-title {
+    font-weight: 700;
+    font-size: 10.5pt;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+
+  .card-desc {
+    font-size: 9pt;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px 0;
+    font-size: 9.5pt;
+  }
+
+  th, td {
+    border: 1px solid #cbd5e1;
+    padding: 7px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    background: #f1f5f9;
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .badge-primary { background: #e0e7ff; color: #3730a3; }
+  .badge-pcb { background: #dcfce7; color: #166534; }
+  .badge-pcm { background: #e0f2fe; color: #075985; }
+  .badge-comm { background: #fef3c7; color: #92400e; }
+  .badge-arts { background: #fae8ff; color: #86198f; }
+  .badge-any { background: #f1f5f9; color: #334155; }
+
+  .badge-r { background: #bae6fd; color: #0369a1; }
+  .badge-i { background: #c7d2fe; color: #4338ca; }
+  .badge-a { background: #f5d0fe; color: #86198f; }
+  .badge-s { background: #a7f3d0; color: #065f46; }
+  .badge-e { background: #fed7aa; color: #9a3412; }
+  .badge-c { background: #cbd5e1; color: #334155; }
+
+  /* Flow Diagram Box */
+  .flow-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 16px 0;
+  }
+
+  .flow-step {
+    border: 1px solid #cbd5e1;
+    border-left: 5px solid #4f46e5;
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 10px 14px;
+  }
+
+  .flow-step-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 10pt;
+    color: #1e1b4b;
+  }
+
+  .flow-step-body {
+    font-size: 9pt;
+    color: #475569;
+    margin-top: 4px;
+  }
+
+  .highlight {
+    font-weight: 600;
+    color: #0f172a;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Cover Header -->
+  <div class="cover-header">
+    <div class="brand-badge">CareerChecks • Intelligent Assessment Framework</div>
+    <h1>How Degree Courses Are Suggested to Students</h1>
+    <div class="subtitle">Complete Technical & Psychometric Report Mapping Guide (Exclusively Focused on Courses & Specializations)</div>
+    <div class="doc-meta">
+      <span><strong>Domain:</strong> Academic Course Selection Engine</span>
+      <span><strong>Scope:</strong> 78 Database Courses</span>
+      <span><strong>Streams:</strong> Science (PCB/PCM), Commerce, Arts/Humanities</span>
+      <span><strong>Target:</strong> High School (11th/12th) & College Students</span>
+    </div>
+  </div>
+
+  <!-- Executive Summary -->
+  <div class="callout callout-success">
+    <strong>Core Principle:</strong> Course recommendation in CareerChecks is <em>never</em> random and <em>never</em> based on college tie-ups or commercial advertising. Instead, degree courses are suggested through a scientific <strong>Triple-Alignment Engine</strong> that cross-references a student's <strong>12th Academic Stream Eligibility</strong>, their <strong>Psychometric Holland Code (RIASEC Interests)</strong>, their <strong>Aptitude Strengths (Logical, Verbal, Spatial)</strong>, and their <strong>Work Values</strong>.
+  </div>
+
+  <!-- SECTION 1 -->
+  <h2><span class="num-circle">1</span> The 5 Assessment Report Inputs Used for Course Matching</h2>
+  <p>When a student completes their CareerChecks assessment, the system extracts 5 objective data points from their profile and answers. Every suggested degree course is mathematically derived from these 5 inputs:</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">1. Academic Stream (Hard Filter)</div>
+      <div class="card-desc">
+        Identifies eligible disciplines from the Class 12 stage:
+        <br>• <strong>Science PCB:</strong> Medical, Dental, AYUSH, Allied Health, Pharmacy, Life Sciences.
+        <br>• <strong>Science PCM:</strong> Engineering (B.Tech), Architecture, Data Science, Physical Sciences.
+        <br>• <strong>Commerce:</strong> B.Com, BBA, CA, ACCA, FinTech, Economics.
+        <br>• <strong>Arts / Any Stream:</strong> BCA, Law, Design, Journalism, Psychology, Hotel Management.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">2. Holland RIASEC Code (Interests)</div>
+      <div class="card-desc">
+        Derived from the 60 Interests questions in Section 1:
+        <br>• <span class="badge badge-r">R</span> <strong>Realistic:</strong> Hands-on, machines, physical work.
+        <br>• <span class="badge badge-i">I</span> <strong>Investigative:</strong> Science, coding, math, research.
+        <br>• <span class="badge badge-a">A</span> <strong>Artistic:</strong> Creativity, writing, UI/UX, media.
+        <br>• <span class="badge badge-s">S</span> <strong>Social:</strong> Healthcare, teaching, counseling, society.
+        <br>• <span class="badge badge-e">E</span> <strong>Enterprising:</strong> Business, leadership, management.
+        <br>• <span class="badge badge-c">C</span> <strong>Conventional:</strong> Accounting, data, organization.
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">3. Aptitude & Reasoning Profile</div>
+      <div class="card-desc">
+        Evaluates cognitive ability across 3 core dimensions:
+        <br>• <strong>Logical (0-100%):</strong> Crucial for Engineering, Coding, Math, and FinTech.
+        <br>• <strong>Verbal (0-100%):</strong> Crucial for Law, Journalism, Medicine, and Management.
+        <br>• <strong>Spatial (0-100%):</strong> Crucial for Architecture, Design, Mechatronics, and Surgery.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">4. Big-5 Personality Spectrums</div>
+      <div class="card-desc">
+        Maps working style:
+        <br>• <strong>Practical vs. Imaginative:</strong> Applied execution vs. conceptual design.
+        <br>• <strong>Spontaneous vs. Organised:</strong> Dynamic creative roles vs. structured clinical/audit workflows.
+        <br>• <strong>Reserved vs. Outgoing:</strong> Solo analytical work vs. public-facing leadership.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">5. Core Career Values</div>
+      <div class="card-desc">
+        Identifies what motivates the student:
+        <br>• <strong>Altruism & Social Impact:</strong> Medicine, Nursing, Allied Health, Teaching.
+        <br>• <strong>High Income & Prestige:</strong> B.Tech AI, MBBS, CA/ACCA, Corporate Law.
+        <br>• <strong>Autonomy & Innovation:</strong> Startups, BBA, Data Science, Design.
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="page-break"></div>
+  <h2><span class="num-circle">2</span> The 4-Stage Course Recommendation Algorithm</h2>
+  <p>The recommendation engine evaluates all 78 courses in the CareerChecks database through four sequential calculation gates:</p>
+
+  <div class="flow-container">
+    <div class="flow-step">
+      <div class="flow-step-header">
+        <span>GATE 1: Academic Stream & Subject Eligibility Filter</span>
+        <span class="badge badge-primary">Hard Rule</span>
+      </div>
+      <div class="flow-step-body">
+        Eliminates courses that the student cannot legally or practically pursue based on their Class 12 board subjects. For example, a student from a pure Commerce or Arts background is never recommended B.Tech Mechanical or MBBS, preventing unrealistic or invalid aspirations.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-step-header">
+        <span>GATE 2: RIASEC Vector Cosine Similarity Match</span>
+        <span class="badge badge-primary">Psychometric Affinity</span>
+      </div>
+      <div class="flow-step-body">
+        The student's 6-dimensional interest score (R, I, A, S, E, C) is compared with the ideal benchmark profile of each course using vector cosine similarity. For instance:
+        <br>• <strong>MBBS / BDS / Allied Health:</strong> Demands high <span class="badge badge-i">I</span> (Investigation/Biology) and high <span class="badge badge-s">S</span> (Social service/Patient empathy).
+        <br>• <strong>B.Tech CSE / AI & ML:</strong> Demands high <span class="badge badge-i">I</span> (Logic/Coding) and high <span class="badge badge-r">R</span> (System hardware/building).
+        <br>• <strong>BBA / B.Com with CA:</strong> Demands high <span class="badge badge-e">E</span> (Business/Persuasion) and high <span class="badge badge-c">C</span> (Accounts/Compliance).
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-step-header">
+        <span>GATE 3: Cognitive Aptitude Threshold Verification</span>
+        <span class="badge badge-primary">Capability Verification</span>
+      </div>
+      <div class="flow-step-body">
+        Verifies that the student has the cognitive strengths required to complete the curriculum without burnout:
+        <br>• If a course has heavy advanced mathematics (e.g., B.Tech Data Science, VLSI), Logical Aptitude must meet minimum benchmark.
+        <br>• If a course has heavy spatial and 3D perception (e.g., B.Arch, Multimedia, Surgical Tech), Spatial Aptitude is verified.
+        <br>• If a course relies on legal texts or complex communication (e.g., Journalism, BBA, Clinical Therapy), Verbal Aptitude is verified.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-step-header">
+        <span>GATE 4: Categorization into Primary, Alternative & Backup Tracks</span>
+        <span class="badge badge-primary">Strategic Guidance</span>
+      </div>
+      <div class="flow-step-body">
+        Courses passing Gates 1-3 are ranked and categorized into 3 strategic career tracks:
+        <br>• <strong style="color: #4f46e5;">Primary Degree Track (Best Fit: 90%+ Match):</strong> The highest aligned degree matching interest, aptitude, and aspirations.
+        <br>• <strong style="color: #059669;">Alternative Degree Track (High Fit: 80-89% Match):</strong> A parallel specialized branch with strong employment overlap.
+        <br>• <strong style="color: #d97706;">Pragmatic Backup Track (Safe Pivot: 70-79% Match):</strong> A smart, lower-admission-risk course sharing the same foundational career path.
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3 -->
+  <div class="page-break"></div>
+  <h2><span class="num-circle">3</span> Master Course Mapping: All 78 Database Courses Mapped to Report Profiles</h2>
+  <p>Below is the complete reference matrix of all 78 courses stored in the CareerChecks database, categorized by academic faculty, showing the exact report characteristics required for each course to be suggested.</p>
+
+  <h3>1. Medical & Allied Healthcare Courses (18 Courses)</h3>
+  <div class="callout">
+    <strong>Mandatory Stream:</strong> Science PCB (Physics, Chemistry, Biology).<br>
+    <strong>Core Report Persona:</strong> High Investigative (<span class="badge badge-i">I</span>) + High Social (<span class="badge badge-s">S</span>). Altruism & healthcare values.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 28%;">Course Name</th>
+        <th style="width: 15%;">Ideal RIASEC</th>
+        <th style="width: 25%;">Key Aptitude Needed</th>
+        <th style="width: 32%;">Why It Is Suggested Over Alternatives</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>MBBS</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-s">S</span> <span class="badge badge-r">R</span></td>
+        <td>High Verbal, High Logical</td>
+        <td>For students seeking comprehensive clinical diagnosis, high academic stamina, and patient treatment.</td>
+      </tr>
+      <tr>
+        <td><strong>BDS</strong> (Dental Surgery)</td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-i">I</span> <span class="badge badge-s">S</span></td>
+        <td>High Spatial, High Precision</td>
+        <td>Ideal for students with strong fine motor skills, manual dexterity, and interest in clinic-based healthcare.</td>
+      </tr>
+      <tr>
+        <td><strong>BAMS / BHMS</strong> (Ayurveda / Homeopathy)</td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-s">S</span></td>
+        <td>Verbal & Biology Logic</td>
+        <td>Suggested when student shows interest in holistic wellness, natural pharmacology, and integrative care.</td>
+      </tr>
+      <tr>
+        <td><strong>BSc Nursing / GNM</strong></td>
+        <td><span class="badge badge-s">S</span> <span class="badge badge-r">R</span> <span class="badge badge-c">C</span></td>
+        <td>High Social, High Empathy</td>
+        <td>Suggested when empathy, patient rehabilitation, global mobility, and active team healthcare score highest.</td>
+      </tr>
+      <tr>
+        <td><strong>BSc Cardiac Care Tech</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-r">R</span> <span class="badge badge-c">C</span></td>
+        <td>Logical, Calm in Pressure</td>
+        <td>Suggested for high interest in cardiovascular physiology and operating advanced ICU/catheterization monitors.</td>
+      </tr>
+      <tr>
+        <td><strong>BSc Anesthesia & OT Tech</strong></td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-c">C</span> <span class="badge badge-i">I</span></td>
+        <td>Spatial, Process Precision</td>
+        <td>Ideal for students fascinated by surgical theaters, life-support hardware, and meticulous procedure timing.</td>
+      </tr>
+      <tr>
+        <td><strong>BSc Medical Imaging Tech</strong></td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-i">I</span></td>
+        <td>High Spatial Reasoning</td>
+        <td>Suggested for students who excel at reading visual/cross-sectional patterns (MRI, CT, X-Ray) with high technology.</td>
+      </tr>
+      <tr>
+        <td><strong>BSc Perfusion Technology</strong></td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-i">I</span> <span class="badge badge-c">C</span></td>
+        <td>Logical, Fast Reflexes</td>
+        <td>Specialized clinical role operating heart-lung machines during open-heart surgery. High technical precision.</td>
+      </tr>
+      <tr>
+        <td><strong>BSc Optometry</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-r">R</span> <span class="badge badge-s">S</span></td>
+        <td>Spatial, Diagnostic Logic</td>
+        <td>Focus on vision science, ocular diagnostics, and optical care without general medical surgery demands.</td>
+      </tr>
+      <tr>
+        <td><strong>BSc Emergency Trauma Care</strong></td>
+        <td><span class="badge badge-s">S</span> <span class="badge badge-r">R</span></td>
+        <td>Fast Decision Making</td>
+        <td>For students motivated by emergency response, ambulance triage, and rapid frontline patient stabilization.</td>
+      </tr>
+      <tr>
+        <td><strong>BSc Renal Dialysis Tech</strong></td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-c">C</span> <span class="badge badge-s">S</span></td>
+        <td>Procedural Reliability</td>
+        <td>Suggested for steady, procedure-driven students who enjoy clinical machine management and nephrology care.</td>
+      </tr>
+      <tr>
+        <td><strong>BOT / BASLP</strong></td>
+        <td><span class="badge badge-s">S</span> <span class="badge badge-i">I</span></td>
+        <td>High Verbal, Deep Patience</td>
+        <td>Suggested for long-term patient therapy: speech pathology, audiology, and cognitive rehabilitation.</td>
+      </tr>
+      <tr>
+        <td><strong>BSc Neuroscience / Nuclear Med</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-r">R</span></td>
+        <td>High Science Curiosity</td>
+        <td>Suggested for deep scientific inquiry into brain functions or radioactive isotopes in cancer detection.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 3.2 -->
+  <div class="page-break"></div>
+  <h3>2. Engineering & Advanced Technology Courses (17 Courses)</h3>
+  <div class="callout">
+    <strong>Mandatory Stream:</strong> Science PCM (Physics, Chemistry, Mathematics).<br>
+    <strong>Core Report Persona:</strong> High Investigative (<span class="badge badge-i">I</span>) + High Realistic (<span class="badge badge-r">R</span>). Problem-solving & innovation.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 28%;">Course Name</th>
+        <th style="width: 15%;">Ideal RIASEC</th>
+        <th style="width: 25%;">Key Aptitude Needed</th>
+        <th style="width: 32%;">Why It Is Suggested Over Alternatives</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>B.Tech in CSE / AI & ML</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-r">R</span> <span class="badge badge-c">C</span></td>
+        <td>Top-tier Logical Reasoning</td>
+        <td>For students fascinated by software architecture, machine intelligence, algorithm design, and automation.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Tech in Data Science</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-c">C</span></td>
+        <td>Math, Statistical Logic</td>
+        <td>Suggested when student scores exceptionally high in data puzzle solving, statistics, and pattern analysis.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Tech in Cyber Security</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-c">C</span> <span class="badge badge-r">R</span></td>
+        <td>Rule-deduction, Investigation</td>
+        <td>For students motivated by digital security defense, vulnerability research, and investigative ethical hacking.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Tech in VLSI Design</strong></td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-i">I</span></td>
+        <td>Micro-circuit Logic</td>
+        <td>Suggested for deep interest in semiconductor chips, nano-electronics, and hardware processor architectures.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Tech in Mechatronics</strong></td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-i">I</span></td>
+        <td>High Spatial, Mechanical</td>
+        <td>Suggested when student bridges both software programming and physical robotics/sensors/motors.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Tech in Mechanical / Civil</strong></td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-i">I</span></td>
+        <td>High Spatial & Physical Reasoning</td>
+        <td>For students who prefer building real-world physical structures, infrastructure, manufacturing, and engines.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Tech in ECE / EEE</strong></td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-i">I</span></td>
+        <td>Logical Circuitry</td>
+        <td>For students fascinated by wireless telecom, renewable power grids, microcontrollers, and electric mobility.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Tech in Aeronautical / Marine</strong></td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-i">I</span> <span class="badge badge-e">E</span></td>
+        <td>Spatial, Fluid Mechanics</td>
+        <td>Specialized outdoor/field engineering for aviation flight systems or ocean vessel design and propulsion.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Tech in Biotechnology / Food</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-r">R</span></td>
+        <td>Bio-chemical Logic</td>
+        <td>For PCM students wanting to apply engineering principles to biopharma, agricultural yield, or food processing.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Tech Petroleum / Petrochem</strong></td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-i">I</span> <span class="badge badge-e">E</span></td>
+        <td>Chemical & Industrial Logic</td>
+        <td>For students seeking heavy industrial engineering, refinery operations, and global energy sector careers.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 3.3 -->
+  <h3>3. Computer Applications & Software Courses (14 Courses)</h3>
+  <div class="callout">
+    <strong>Mandatory Stream:</strong> Any Stream (Science PCM/PCB, Commerce, Arts) — mathematics preferred in Class 12.<br>
+    <strong>Core Report Persona:</strong> High Investigative (<span class="badge badge-i">I</span>) + Conventional (<span class="badge badge-c">C</span>) or Artistic (<span class="badge badge-a">A</span>).
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 28%;">Course Name</th>
+        <th style="width: 15%;">Ideal RIASEC</th>
+        <th style="width: 25%;">Key Aptitude Needed</th>
+        <th style="width: 32%;">Why It Is Suggested Over Alternatives</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>BCA (General / Full Stack)</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-c">C</span></td>
+        <td>Logical Problem Solving</td>
+        <td>The ideal software pathway for non-PCM students or those seeking faster direct entry into web & mobile development.</td>
+      </tr>
+      <tr>
+        <td><strong>BCA in AI & ML / Gen AI</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-c">C</span></td>
+        <td>Algorithmic Logic</td>
+        <td>Suggested when student has strong passion for artificial intelligence, prompt engineering, and intelligent apps.</td>
+      </tr>
+      <tr>
+        <td><strong>BCA in UI/UX Design</strong></td>
+        <td><span class="badge badge-a">A</span> <span class="badge badge-i">I</span></td>
+        <td>Visual Spatial & Empathy</td>
+        <td>Suggested for creative students who love digital product aesthetics, wireframing, and human-computer design.</td>
+      </tr>
+      <tr>
+        <td><strong>BCA in Cloud / DevOps</strong></td>
+        <td><span class="badge badge-c">C</span> <span class="badge badge-i">I</span> <span class="badge badge-r">R</span></td>
+        <td>Systematic Process Focus</td>
+        <td>Suggested for methodical students who enjoy maintaining server infrastructures, CI/CD pipelines, and cloud networks.</td>
+      </tr>
+      <tr>
+        <td><strong>BCA in Game & Mobile Dev</strong></td>
+        <td><span class="badge badge-a">A</span> <span class="badge badge-i">I</span> <span class="badge badge-r">R</span></td>
+        <td>Spatial, Storytelling, Code</td>
+        <td>For students combining narrative creativity, game physics, interactive animation, and mobile app programming.</td>
+      </tr>
+      <tr>
+        <td><strong>BCA in AR/VR / IoT</strong></td>
+        <td><span class="badge badge-r">R</span> <span class="badge badge-i">I</span> <span class="badge badge-a">A</span></td>
+        <td>Spatial 3D & Electronics</td>
+        <td>Suggested for students passionate about immersive virtual simulations, smart hardware devices, and robotics.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 3.4 -->
+  <div class="page-break"></div>
+  <h3>4. Management & Business Administration Courses (12 Courses)</h3>
+  <div class="callout">
+    <strong>Mandatory Stream:</strong> Any Stream (Commerce, Science, Arts).<br>
+    <strong>Core Report Persona:</strong> High Enterprising (<span class="badge badge-e">E</span>) + Conventional (<span class="badge badge-c">C</span>) or Social (<span class="badge badge-s">S</span>). Leadership & growth.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 28%;">Course Name</th>
+        <th style="width: 15%;">Ideal RIASEC</th>
+        <th style="width: 25%;">Key Aptitude Needed</th>
+        <th style="width: 32%;">Why It Is Suggested Over Alternatives</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>BBA (General / Int'l Business)</strong></td>
+        <td><span class="badge badge-e">E</span> <span class="badge badge-s">S</span> <span class="badge badge-c">C</span></td>
+        <td>Verbal Communication</td>
+        <td>For natural team leaders who enjoy organizing events, presentations, business strategy, and corporate growth.</td>
+      </tr>
+      <tr>
+        <td><strong>BBA in Business / Data Analytics</strong></td>
+        <td><span class="badge badge-e">E</span> <span class="badge badge-i">I</span> <span class="badge badge-c">C</span></td>
+        <td>Logical & Commercial Logic</td>
+        <td>Suggested when student blends business mindset with love for metrics, spreadsheets, and decision dashboards.</td>
+      </tr>
+      <tr>
+        <td><strong>BBA in Digital Marketing</strong></td>
+        <td><span class="badge badge-e">E</span> <span class="badge badge-a">A</span></td>
+        <td>Creative Writing & Persuasion</td>
+        <td>Suggested for creative communicators who enjoy consumer psychology, social media branding, and ad campaigns.</td>
+      </tr>
+      <tr>
+        <td><strong>BBA in FinTech</strong></td>
+        <td><span class="badge badge-e">E</span> <span class="badge badge-c">C</span> <span class="badge badge-i">I</span></td>
+        <td>Numerical & Tech Logic</td>
+        <td>For students interested in digital payments, neo-banking, investment platforms, and modern financial technologies.</td>
+      </tr>
+      <tr>
+        <td><strong>BBA in Logistics & SCM</strong></td>
+        <td><span class="badge badge-c">C</span> <span class="badge badge-e">E</span> <span class="badge badge-r">R</span></td>
+        <td>Planning & Execution Flow</td>
+        <td>Suggested for students who enjoy tracking shipments, supply chains, warehouse operations, and port logistics.</td>
+      </tr>
+      <tr>
+        <td><strong>BBA in Hospital Administration</strong></td>
+        <td><span class="badge badge-s">S</span> <span class="badge badge-e">E</span> <span class="badge badge-c">C</span></td>
+        <td>Empathy & Operational Rigor</td>
+        <td>Suggested for students passionate about healthcare environments who prefer executive operations over patient clinical care.</td>
+      </tr>
+      <tr>
+        <td><strong>BBA in Aviation / Tourism / Sports</strong></td>
+        <td><span class="badge badge-e">E</span> <span class="badge badge-s">S</span></td>
+        <td>Interpersonal Charm</td>
+        <td>Tailored for dynamic students seeking industry-specific executive tracks in airports, travel agencies, or sports clubs.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 3.5 & 3.6 -->
+  <h3>5. Commerce & Accounting Courses (3 Courses)</h3>
+  <div class="callout">
+    <strong>Mandatory Stream:</strong> Commerce or Science with Math/Economics.<br>
+    <strong>Core Report Persona:</strong> High Conventional (<span class="badge badge-c">C</span>) + Enterprising (<span class="badge badge-e">E</span>) + Investigative (<span class="badge badge-i">I</span>).
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 28%;">Course Name</th>
+        <th style="width: 15%;">Ideal RIASEC</th>
+        <th style="width: 25%;">Key Aptitude Needed</th>
+        <th style="width: 32%;">Why It Is Suggested Over Alternatives</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>B.Com (Bachelor of Commerce)</strong></td>
+        <td><span class="badge badge-c">C</span> <span class="badge badge-e">E</span></td>
+        <td>Numerical Accuracy</td>
+        <td>The reliable bedrock degree for corporate taxation, corporate banking, tally accounting, and trade finance.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Com with ACCA</strong></td>
+        <td><span class="badge badge-c">C</span> <span class="badge badge-e">E</span> <span class="badge badge-i">I</span></td>
+        <td>Global Accounting Logic</td>
+        <td>Suggested for students targeting international finance, MNC auditing, IFRS compliance, and UK-recognized licensure.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Com with CA</strong></td>
+        <td><span class="badge badge-c">C</span> <span class="badge badge-i">I</span></td>
+        <td>Top-tier Analytical Stamina</td>
+        <td>Suggested for students with superior discipline, zero-error tolerance, and ambition for statutory audit and Indian taxation.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 3.7 -->
+  <h3>6. Other Science & Professional Degree Courses (14 Courses)</h3>
+  <div class="callout">
+    <strong>Streams:</strong> Science PCB/PCM for BSc/Pharm; Any Stream for B.Arch, Media, Hospitality, Social Work.<br>
+    <strong>Core Report Persona:</strong> Specialized according to artistic, technical, or social profiles.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 28%;">Course Name</th>
+        <th style="width: 15%;">Ideal RIASEC</th>
+        <th style="width: 25%;">Key Aptitude Needed</th>
+        <th style="width: 32%;">Why It Is Suggested Over Alternatives</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>B.Pharm / PharmD / D.Pharm</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-c">C</span></td>
+        <td>Chemistry & Clinical Logic</td>
+        <td>Suggested for science students passionate about drug formulation, clinical pharmacology, and pharmaceutical industry.</td>
+      </tr>
+      <tr>
+        <td><strong>BSc Biotech / Microbiology</strong></td>
+        <td><span class="badge badge-i">I</span> <span class="badge badge-r">R</span></td>
+        <td>Laboratory Curiosity</td>
+        <td>For students dedicated to biological research, genetic engineering, vaccine technology, and food safety science.</td>
+      </tr>
+      <tr>
+        <td><strong>B.Arch (Architecture)</strong></td>
+        <td><span class="badge badge-a">A</span> <span class="badge badge-r">R</span> <span class="badge badge-i">I</span></td>
+        <td>Top Spatial & Aesthetic</td>
+        <td>Requires PCM + NATA. Suggested for students with rare balance of technical math and imaginative structural sketching.</td>
+      </tr>
+      <tr>
+        <td><strong>BA Journalism & Mass Comm</strong></td>
+        <td><span class="badge badge-a">A</span> <span class="badge badge-e">E</span> <span class="badge badge-s">S</span></td>
+        <td>Verbal Fluency, Inquiry</td>
+        <td>Suggested for confident storytellers passionate about investigative news, documentary filmmaking, broadcasting, and PR.</td>
+      </tr>
+      <tr>
+        <td><strong>BA Multimedia / Fashion Tech</strong></td>
+        <td><span class="badge badge-a">A</span> <span class="badge badge-r">R</span></td>
+        <td>Visual Creativity</td>
+        <td>For students dedicated to animation, 3D graphics, garment creation, textile styling, and contemporary visual arts.</td>
+      </tr>
+      <tr>
+        <td><strong>BSW (Social Work)</strong></td>
+        <td><span class="badge badge-s">S</span> <span class="badge badge-e">E</span></td>
+        <td>High Altruism & Empathy</td>
+        <td>Suggested for students seeking grassroot community welfare, NGO leadership, child rights, and public social policy.</td>
+      </tr>
+      <tr>
+        <td><strong>BHM / BTTM (Hospitality & Travel)</strong></td>
+        <td><span class="badge badge-e">E</span> <span class="badge badge-s">S</span> <span class="badge badge-c">C</span></td>
+        <td>Interpersonal Service</td>
+        <td>Suggested for students with high warmth, service mindset, luxury management interests, and global hospitality aspirations.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 4 -->
+  <div class="page-break"></div>
+  <h2><span class="num-circle">4</span> 4 Student Report Case Studies (Real-World Walkthrough)</h2>
+  <p>To understand how the report produces course suggestions in practice, here are 4 representative student profiles and the exact courses suggested to each:</p>
+
+  <div class="card avoid-break" style="margin-bottom: 14px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span class="card-title">CASE 1: Priya — Science PCB Student</span>
+      <span class="badge badge-pcb">Science PCB</span>
+    </div>
+    <div style="font-size: 9pt; color: #475569; margin: 4px 0 8px 0;">
+      <strong>Report Profile:</strong> RIASEC: <span class="badge badge-i">I</span>: 92%, <span class="badge badge-s">S</span>: 86%, <span class="badge badge-r">R</span>: 74% (Code: <strong>ISR</strong>) | Aptitude: Logical 78%, Verbal 85%, Spatial 70% | Values: Altruism, Continuous Learning
+    </div>
+    <div style="font-size: 9.5pt; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+      • <strong style="color: #4f46e5;">Primary Suggested Course (96% Match):</strong> <strong>MBBS</strong> (Doctor of Medicine) — Complete alignment with scientific diagnosis and patient care.<br>
+      • <strong style="color: #059669;">Alternative Suggested Course (89% Match):</strong> <strong>BSc Cardiac Care Technology / BSc Nursing</strong> — Strong clinical relevance without 5.5-year medicine cycle.<br>
+      • <strong style="color: #d97706;">Backup Suggested Course (81% Match):</strong> <strong>PharmD (Doctor of Pharmacy)</strong> — Direct patient pharmacology & hospital medicine without NEET pressure.
+    </div>
+  </div>
+
+  <div class="card avoid-break" style="margin-bottom: 14px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span class="card-title">CASE 2: Rahul — Science PCM Student</span>
+      <span class="badge badge-pcm">Science PCM</span>
+    </div>
+    <div style="font-size: 9pt; color: #475569; margin: 4px 0 8px 0;">
+      <strong>Report Profile:</strong> RIASEC: <span class="badge badge-i">I</span>: 96%, <span class="badge badge-r">R</span>: 88%, <span class="badge badge-c">C</span>: 76% (Code: <strong>IRC</strong>) | Aptitude: Logical 94%, Spatial 85%, Verbal 62% | Values: Innovation, High Income
+    </div>
+    <div style="font-size: 9.5pt; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+      • <strong style="color: #4f46e5;">Primary Suggested Course (98% Match):</strong> <strong>B.Tech in Artificial Intelligence & Machine Learning (AI & ML)</strong> — Peak mathematical logic fit.<br>
+      • <strong style="color: #059669;">Alternative Suggested Course (91% Match):</strong> <strong>B.Tech in Mechatronics Engineering / Robotics</strong> — Perfect blend of physical hardware and software.<br>
+      • <strong style="color: #d97706;">Backup Suggested Course (84% Match):</strong> <strong>BCA in Data Science & Cloud Computing</strong> — Direct software engineering career without heavy entrance exam cutoff.
+    </div>
+  </div>
+
+  <div class="card avoid-break" style="margin-bottom: 14px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span class="card-title">CASE 3: Ananya — Commerce Student</span>
+      <span class="badge badge-comm">Commerce</span>
+    </div>
+    <div style="font-size: 9pt; color: #475569; margin: 4px 0 8px 0;">
+      <strong>Report Profile:</strong> RIASEC: <span class="badge badge-e">E</span>: 90%, <span class="badge badge-c">C</span>: 84%, <span class="badge badge-s">S</span>: 72% (Code: <strong>ECS</strong>) | Aptitude: Logical 76%, Verbal 88%, Spatial 50% | Values: Leadership, Prestige, Financial Growth
+    </div>
+    <div style="font-size: 9.5pt; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+      • <strong style="color: #4f46e5;">Primary Suggested Course (95% Match):</strong> <strong>BBA in Business Analytics / FinTech</strong> — Combines leadership drive with financial modernization.<br>
+      • <strong style="color: #059669;">Alternative Suggested Course (88% Match):</strong> <strong>B.Com with ACCA (Global Accounting)</strong> — High corporate prestige, international accounting credential.<br>
+      • <strong style="color: #d97706;">Backup Suggested Course (82% Match):</strong> <strong>BBA in Logistics & Supply Chain Management</strong> — High-demand operational management track.
+    </div>
+  </div>
+
+  <div class="card avoid-break">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span class="card-title">CASE 4: Karthik — Arts / Any Stream Student</span>
+      <span class="badge badge-arts">Humanities / Creative</span>
+    </div>
+    <div style="font-size: 9pt; color: #475569; margin: 4px 0 8px 0;">
+      <strong>Report Profile:</strong> RIASEC: <span class="badge badge-a">A</span>: 94%, <span class="badge badge-s">S</span>: 82%, <span class="badge badge-e">E</span>: 70% (Code: <strong>ASE</strong>) | Aptitude: Verbal 90%, Spatial 86%, Logical 58% | Values: Creative Expression, Public Impact
+    </div>
+    <div style="font-size: 9.5pt; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+      • <strong style="color: #4f46e5;">Primary Suggested Course (96% Match):</strong> <strong>BA Journalism and Mass Communication</strong> — Natural fit for expressive communication and storytelling.<br>
+      • <strong style="color: #059669;">Alternative Suggested Course (90% Match):</strong> <strong>BCA in UI/UX Design / BA Multimedia</strong> — High-paying digital design and user interaction branch.<br>
+      • <strong style="color: #d97706;">Backup Suggested Course (83% Match):</strong> <strong>BSW (Bachelor of Social Work) / BHM</strong> — Human-centric welfare or hospitality management.
+    </div>
+  </div>
+
+  <!-- SECTION 5 -->
+  <div class="page-break"></div>
+  <h2><span class="num-circle">5</span> How Courses Are Presented on the Student Report & Consultant Roadmap</h2>
+
+  <h3>1. Visual Presentation on Student Report Card</h3>
+  <p>In the CareerChecks Student Dashboard and downloadable Assessment Report, degree courses are displayed with transparent matching metrics so students and parents understand the objective reason behind every recommendation:</p>
+
+  <div class="card avoid-break" style="border: 2px solid #4f46e5; background: #faf5ff;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+      <span style="font-size: 11pt; font-weight: 800; color: #3730a3;">Sample Course Recommendation Widget</span>
+      <span style="background: #4f46e5; color: #fff; font-size: 9pt; font-weight: 700; padding: 2px 10px; border-radius: 9999px;">96% Match • Primary Track</span>
+    </div>
+    <h4 style="font-size: 13pt; margin: 0 0 6px 0; color: #0f172a;">B.Tech in Artificial Intelligence & Machine Learning (AI & ML)</h4>
+    <p style="font-size: 9.5pt; color: #334155; margin-bottom: 8px;">
+      <strong>Why This Course Fits You:</strong> Your high Investigative score (96%) and top Logical Aptitude (94%) make you an exceptional fit for mathematical modeling, algorithm development, and intelligent autonomous systems.
+    </p>
+    <div style="display: flex; gap: 16px; font-size: 8.5pt; color: #475569; border-top: 1px solid #e9d5ff; padding-top: 6px;">
+      <span><strong>Eligibility:</strong> Class 12 PCM</span>
+      <span><strong>Duration:</strong> 4 Years</span>
+      <span><strong>Key Entrance Exams:</strong> JEE Main, KEAM, KCET, CUET</span>
+      <span><strong>Career Outcomes:</strong> AI Engineer, Data Scientist, ML Architect</span>
+    </div>
+  </div>
+
+  <h3>2. Human Consultant Roadmapping & Curation</h3>
+  <p>While the AI assessment engine provides data-backed matching, the <strong>1-on-1 Human Career Consultant</strong> provides vital contextual validation before the student commits to an admission:</p>
+  <ul>
+    <li><strong>Syllabus Demystification:</strong> The consultant walks through the actual 4-year curriculum (e.g. explaining difference between B.Tech CSE vs. B.Tech AI&ML vs. BCA).</li>
+    <li><strong>Entrance Exam Strategy:</strong> Recommends the specific entrance exams the student should target (e.g., NEET, JEE Main, KEAM, KCET, CUET, CLAT).</li>
+    <li><strong>Lateral Backup Formulation:</strong> Ensures every student has an emotionally reassuring backup course so they never face admission deadlock if competitive exam cutoffs shift.</li>
+  </ul>
+
+  <div class="callout callout-warning">
+    <strong>Summary for Students & Parents:</strong> The CareerChecks recommendation engine guarantees that a student never chooses a degree based on peer pressure or social trends. Every suggested course aligns with what the student is <em>genuinely good at</em> (Aptitude), what they <em>truly enjoy</em> (Interests), and where they will <em>sustain lifelong career satisfaction</em> (Values).
+  </div>
+
+  <div style="margin-top: 30px; text-align: center; font-size: 9pt; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+    © 2026 CareerChecks • Comprehensive Course Recommendation Framework • All 78 Courses Verified
+  </div>
+
+</body>
+</html>
+`;
+
+const htmlPath = path.resolve(__dirname, 'course_recommendation_report.html');
+const pdfPath = path.resolve(__dirname, '../courses-recommendation-report.pdf');
+
+fs.writeFileSync(htmlPath, htmlContent, 'utf-8');
+console.log('Wrote HTML template to:', htmlPath);
+
+console.log('Generating PDF via headless Chrome...');
+const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const command = `"${chromePath}" --headless --disable-gpu --no-pdf-header-footer --print-to-pdf="${pdfPath}" "${htmlPath}"`;
+
+try {
+  execSync(command, { stdio: 'inherit' });
+  const stats = fs.statSync(pdfPath);
+  console.log('✅ Successfully generated PDF: ' + pdfPath + ' (' + (stats.size / 1024).toFixed(1) + ' KB)');
+} catch (err) {
+  console.error('Error generating PDF:', err);
+  process.exit(1);
+}

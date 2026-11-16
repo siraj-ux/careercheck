@@ -47,7 +47,11 @@ function AuthContent() {
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.user) {
-          if (!data.user.dob) {
+          if (data.user.role === 'admin') {
+            router.replace('/admin');
+          } else if (data.user.role === 'consultant') {
+            router.replace('/consultant');
+          } else if (data.user.role === 'student' && !data.user.dob) {
             router.replace(`/auth/consent?redirect=${encodeURIComponent(redirectParam)}`);
           } else {
             router.replace(redirectParam);
@@ -265,10 +269,21 @@ function AuthContent() {
         return;
       }
 
-      // Check if user requires DOB / Minor consent
-      const targetUrl = data.requiresConsent
-        ? `/auth/consent?redirect=${encodeURIComponent(redirectParam)}`
-        : redirectParam;
+      // Direct role-based redirection: Admins & Consultants must never see student onboarding or consent
+      let targetUrl: string;
+      if (data.user?.role === 'admin') {
+        targetUrl = '/admin';
+      } else if (data.user?.role === 'consultant') {
+        targetUrl = '/consultant';
+      } else if (data.requiresConsent) {
+        targetUrl = `/auth/consent?redirect=${encodeURIComponent(redirectParam)}`;
+      } else if (searchParams.get('redirect')) {
+        targetUrl = searchParams.get('redirect')!;
+      } else if (data.redirectUrl) {
+        targetUrl = data.redirectUrl;
+      } else {
+        targetUrl = redirectParam;
+      }
 
       // Full document navigation guarantees the new session cookie is sent with request headers
       window.location.assign(targetUrl);

@@ -99,12 +99,28 @@ export function LandingHeader() {
                 <User className="h-3.5 w-3.5 text-indigo-600" />
                 <span>{user.name || formatPhone(user.phone)}</span>
               </div>
-              <Link
-                href="/onboarding/profile"
-                className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 transition-colors"
-              >
-                Resume Test
-              </Link>
+              {user.role === 'admin' ? (
+                <Link
+                  href="/admin"
+                  className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 transition-colors"
+                >
+                  Admin Console
+                </Link>
+              ) : user.role === 'consultant' ? (
+                <Link
+                  href="/consultant"
+                  className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 transition-colors"
+                >
+                  Consultant Portal
+                </Link>
+              ) : (
+                <Link
+                  href="/dashboard"
+                  className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 transition-colors"
+                >
+                  Student Dashboard
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={handleLogout}
@@ -203,13 +219,31 @@ export function LandingHeader() {
                     <User className="h-4 w-4 text-indigo-600" />
                     <span>Signed in as {formatPhone(user.phone)}</span>
                   </div>
-                  <Link
-                    href="/onboarding/profile"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full text-center py-2.5 rounded-full bg-indigo-600 text-sm font-semibold text-white shadow-xs hover:bg-indigo-700"
-                  >
-                    Resume Test
-                  </Link>
+                  {user.role === 'admin' ? (
+                    <Link
+                      href="/admin"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full text-center py-2.5 rounded-full bg-indigo-600 text-sm font-semibold text-white shadow-xs hover:bg-indigo-700"
+                    >
+                      Admin Console
+                    </Link>
+                  ) : user.role === 'consultant' ? (
+                    <Link
+                      href="/consultant"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full text-center py-2.5 rounded-full bg-indigo-600 text-sm font-semibold text-white shadow-xs hover:bg-indigo-700"
+                    >
+                      Consultant Portal
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full text-center py-2.5 rounded-full bg-indigo-600 text-sm font-semibold text-white shadow-xs hover:bg-indigo-700"
+                    >
+                      Student Dashboard
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => {

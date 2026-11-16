@@ -2,6 +2,7 @@ export * from './users';
 export * from './tests';
 export * from './careers';
 export * from './colleges';
+export * from './courses';
 export * from './consultants';
 export * from './roadmaps';
 export * from './payments';

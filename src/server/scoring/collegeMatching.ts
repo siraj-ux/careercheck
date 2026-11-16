@@ -5,12 +5,12 @@ export interface CollegeEntity {
   name: string;
   city: string;
   state: string;
-  type: string;
-  annualFees: number;
-  cutoffPercent: number;
-  examsJson: string; // JSON: string[]
-  coursesJson: string; // JSON: string[]
-  level: string; // 'UG' | 'PG' | 'both'
+  type?: string | null;
+  annualFees?: number | null;
+  cutoffPercent?: number | null;
+  examsJson?: string | null; // JSON: string[]
+  coursesJson?: string | null; // JSON: string[]
+  level?: string | null; // 'UG' | 'PG' | 'both'
 }
 
 export interface MatchedCollege {
@@ -18,9 +18,9 @@ export interface MatchedCollege {
   name: string;
   city: string;
   state: string;
-  type: string;
-  annualFees: number;
-  cutoffPercent: number;
+  type: string | null;
+  annualFees: number | null;
+  cutoffPercent: number | null;
   exams: string[];
   courses: string[];
   category: 'safe' | 'target' | 'reach';
@@ -70,12 +70,12 @@ export function matchColleges(
 
   for (const col of colleges) {
     // 1. Level check
-    if (col.level !== 'both' && col.level !== level) {
+    if (col.level && col.level !== 'both' && col.level !== level) {
       continue;
     }
 
-    // 2. Budget filter
-    if (col.annualFees > maxAllowedFees) {
+    // 2. Budget filter (only if annualFees is configured)
+    if (col.annualFees != null && col.annualFees > maxAllowedFees) {
       continue;
     }
 
@@ -91,30 +91,39 @@ export function matchColleges(
     // Parse JSON fields safely
     let exams: string[] = [];
     let courses: string[] = [];
-    try {
-      exams = JSON.parse(col.examsJson);
-    } catch {
-      exams = [];
+    if (col.examsJson) {
+      try {
+        exams = JSON.parse(col.examsJson);
+      } catch {
+        exams = [];
+      }
     }
-    try {
-      courses = JSON.parse(col.coursesJson);
-    } catch {
-      courses = [];
+    if (col.coursesJson) {
+      try {
+        courses = JSON.parse(col.coursesJson);
+      } catch {
+        courses = [];
+      }
     }
 
     const cutoff = col.cutoffPercent;
     let category: 'safe' | 'target' | 'reach' | null = null;
 
-    // Rules from product.md:
-    // Safe: marks >= cutoff + 5
-    // Target: marks within cutoff ± 5
-    // Reach: marks below cutoff by > 5 and up to 15 (cutoff - 15 <= marks < cutoff - 5)
-    if (marks >= cutoff + COLLEGE_MATCHING_RULES.safeMargin) {
-      category = 'safe';
-    } else if (Math.abs(marks - cutoff) <= COLLEGE_MATCHING_RULES.targetMargin) {
+    if (cutoff != null) {
+      // Rules from product.md:
+      // Safe: marks >= cutoff + 5
+      // Target: marks within cutoff ± 5
+      // Reach: marks below cutoff by > 5 and up to 15 (cutoff - 15 <= marks < cutoff - 5)
+      if (marks >= cutoff + COLLEGE_MATCHING_RULES.safeMargin) {
+        category = 'safe';
+      } else if (Math.abs(marks - cutoff) <= COLLEGE_MATCHING_RULES.targetMargin) {
+        category = 'target';
+      } else if (marks < cutoff - COLLEGE_MATCHING_RULES.safeMargin && marks >= cutoff - COLLEGE_MATCHING_RULES.reachMarginMax) {
+        category = 'reach';
+      }
+    } else {
+      // If cutoff is not yet set by admin, classify as 'target' match
       category = 'target';
-    } else if (marks < cutoff - COLLEGE_MATCHING_RULES.safeMargin && marks >= cutoff - COLLEGE_MATCHING_RULES.reachMarginMax) {
-      category = 'reach';
     }
 
     if (!category) {
@@ -126,9 +135,9 @@ export function matchColleges(
       name: col.name,
       city: col.city,
       state: col.state,
-      type: col.type,
-      annualFees: col.annualFees,
-      cutoffPercent: col.cutoffPercent,
+      type: col.type ?? null,
+      annualFees: col.annualFees ?? null,
+      cutoffPercent: col.cutoffPercent ?? null,
       exams,
       courses,
       category,
@@ -145,7 +154,9 @@ export function matchColleges(
     if (a.isPreferredCity !== b.isPreferredCity) {
       return a.isPreferredCity ? -1 : 1;
     }
-    return Math.abs(marks - a.cutoffPercent) - Math.abs(marks - b.cutoffPercent);
+    const cutoffA = a.cutoffPercent ?? 0;
+    const cutoffB = b.cutoffPercent ?? 0;
+    return Math.abs(marks - cutoffA) - Math.abs(marks - cutoffB);
   };
 
   safeList.sort(sortFn);

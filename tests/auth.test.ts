@@ -247,4 +247,39 @@ describe('Authentication & Minor Consent Suite', () => {
       expect(attempt6.error).toContain('Maximum verification attempts exceeded');
     });
   });
+
+  describe('6. Role-Based Login Direct Redirection', () => {
+    it('redirects admin directly to /admin and skips minor consent', async () => {
+      const adminPhone = '+919999999999';
+      await sendOtp(adminPhone);
+      const res = await verifyOtpAndLogin(adminPhone, '123456');
+
+      expect(res.success).toBe(true);
+      expect(res.user?.role).toBe('admin');
+      expect(res.requiresConsent).toBe(false);
+      expect(res.redirectUrl).toBe('/admin');
+    });
+
+    it('redirects consultant directly to /consultant and skips minor consent', async () => {
+      const consultantPhone = '+919888888881';
+      await sendOtp(consultantPhone);
+      const res = await verifyOtpAndLogin(consultantPhone, '123456');
+
+      expect(res.success).toBe(true);
+      expect(res.user?.role).toBe('consultant');
+      expect(res.requiresConsent).toBe(false);
+      expect(res.redirectUrl).toBe('/consultant');
+    });
+
+    it('redirects student with DOB directly to /dashboard', async () => {
+      const studentPhone = '+919777777771';
+      await sendOtp(studentPhone);
+      const res = await verifyOtpAndLogin(studentPhone, '123456');
+
+      expect(res.success).toBe(true);
+      expect(res.user?.role).toBe('student');
+      expect(res.requiresConsent).toBe(false);
+      expect(res.redirectUrl).toBe('/dashboard');
+    });
+  });
 });

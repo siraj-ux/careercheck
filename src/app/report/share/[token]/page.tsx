@@ -12,9 +12,11 @@ import { AptitudeBars } from '@/components/report/AptitudeBars';
 import { PersonalitySpectrums } from '@/components/report/PersonalitySpectrums';
 import { CareerCards } from '@/components/report/CareerCards';
 import { CollegeCards } from '@/components/report/CollegeCards';
+import { ConsultantCollegeNotice } from '@/components/report/ConsultantCollegeNotice';
 import { BrandLogo } from '@/components/common/BrandLogo';
 import { ReportPayload } from '@/server/scoring/service';
 import { RiasecLetter } from '@/config/scoring';
+import { FEATURES } from '@/config/features';
 
 interface SharePageProps {
   params: Promise<{ token: string }>;
@@ -157,9 +159,15 @@ function SharedReportContent({ token }: { token: string }) {
           <CareerCards careers={report.careers} />
         )}
 
-        {/* Section 5: Colleges */}
-        {isPaid && report.colleges && (
-          <CollegeCards colleges={report.colleges} />
+        {/* Section 5: Colleges (Hidden by default; consultant will share colleges) */}
+        {isPaid && (
+          <section id="colleges" className="space-y-4">
+            {FEATURES.SHOW_COLLEGES_ON_REPORT && report.colleges ? (
+              <CollegeCards colleges={report.colleges} />
+            ) : (
+              <ConsultantCollegeNotice isSharedView />
+            )}
+          </section>
         )}
       </main>
     </div>

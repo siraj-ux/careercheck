@@ -202,6 +202,14 @@ function TestEngineContent({ sessionId }: { sessionId: string }) {
           router.replace(`/auth?redirect=${encodeURIComponent(`/test/${sessionId}`)}`);
           return;
         }
+        if (data.user.role === 'admin') {
+          router.replace('/admin');
+          return;
+        }
+        if (data.user.role === 'consultant') {
+          router.replace('/consultant');
+          return;
+        }
         if (!data.user.dob) {
           router.replace(`/auth/consent?redirect=${encodeURIComponent(`/test/${sessionId}`)}`);
           return;
@@ -415,10 +423,14 @@ function TestEngineContent({ sessionId }: { sessionId: string }) {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-zinc-600 uppercase tracking-wider">
-                  {currentQ.subType ? `Category: ${currentQ.subType}` : 'Question'}
+                  {currentQ.section === 'interests'
+                    ? 'Interests & Activities'
+                    : currentQ.subType
+                    ? `Category: ${currentQ.subType}`
+                    : 'Question'}
                 </span>
                 <span className="text-xs font-medium text-zinc-600">
-                  {currentQ.type === 'likert' ? 'Likert Scale (1-5)' : 'Multiple Choice (A-D)'}
+                  {currentQ.type === 'likert' ? 'Rate 1 to 5' : 'Multiple Choice (A-D)'}
                 </span>
               </div>
 

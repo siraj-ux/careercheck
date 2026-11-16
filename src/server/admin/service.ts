@@ -5,6 +5,7 @@ import { users, studentProfiles } from '@/server/db/schema/users';
 import { consultants, sessions } from '@/server/db/schema/consultants';
 import { questions, results } from '@/server/db/schema/tests';
 import { colleges } from '@/server/db/schema/colleges';
+import { courses } from '@/server/db/schema/courses';
 import { auditLogs } from '@/server/db/schema/system';
 import { NotificationService } from '@/server/notifications/service';
 
@@ -342,27 +343,30 @@ export class AdminService {
     id?: string;
     name: string;
     city: string;
-    state: string;
-    type: string;
-    annualFees: number;
-    cutoffPercent: number;
-    exams: string[];
-    courses: string[];
-    level: 'UG' | 'PG' | 'both';
+    state?: string | null;
+    type?: string | null;
+    annualFees?: number | null;
+    cutoffPercent?: number | null;
+    exams?: string[] | null;
+    courses?: string[] | null;
+    level?: 'UG' | 'PG' | 'both' | null;
   }) {
     const now = new Date().toISOString();
+    const examsJson = data.exams && data.exams.length > 0 ? JSON.stringify(data.exams) : null;
+    const coursesJson = data.courses && data.courses.length > 0 ? JSON.stringify(data.courses) : null;
+
     if (data.id) {
       await db.update(colleges)
         .set({
           name: data.name,
           city: data.city,
-          state: data.state,
-          type: data.type,
-          annualFees: data.annualFees,
-          cutoffPercent: data.cutoffPercent,
-          examsJson: JSON.stringify(data.exams),
-          coursesJson: JSON.stringify(data.courses),
-          level: data.level,
+          state: data.state || 'India',
+          type: data.type ?? null,
+          annualFees: data.annualFees ?? null,
+          cutoffPercent: data.cutoffPercent ?? null,
+          examsJson,
+          coursesJson,
+          level: data.level ?? 'both',
         })
         .where(eq(colleges.id, data.id));
       return { success: true, id: data.id };
@@ -373,17 +377,97 @@ export class AdminService {
           id,
           name: data.name,
           city: data.city,
-          state: data.state,
-          type: data.type,
-          annualFees: data.annualFees,
-          cutoffPercent: data.cutoffPercent,
-          examsJson: JSON.stringify(data.exams),
-          coursesJson: JSON.stringify(data.courses),
-          level: data.level,
+          state: data.state || 'India',
+          type: data.type ?? null,
+          annualFees: data.annualFees ?? null,
+          cutoffPercent: data.cutoffPercent ?? null,
+          examsJson,
+          coursesJson,
+          level: data.level ?? 'both',
           createdAt: now,
         });
       return { success: true, id };
     }
+  }
+
+  /**
+   * Deletes a college.
+   */
+  static async deleteCollege(adminUserId: string, collegeId: string) {
+    const [existing] = await db.select().from(colleges).where(eq(colleges.id, collegeId)).limit(1);
+    if (!existing) throw new Error('College not found');
+
+    await db.delete(colleges).where(eq(colleges.id, collegeId));
+
+    await db.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      actorId: adminUserId,
+      action: 'delete_college',
+      detailsJson: JSON.stringify({ collegeId, collegeName: existing.name }),
+      createdAt: new Date().toISOString(),
+    });
+
+    return { success: true, id: collegeId };
+  }
+
+  /**
+   * Lists courses.
+   */
+  static async getCourses() {
+    return db.select().from(courses).orderBy(asc(courses.category), asc(courses.name));
+  }
+
+  /**
+   * Adds or updates a course.
+   */
+  static async saveCourse(data: {
+    id?: string;
+    name: string;
+    category: string;
+    level?: 'UG' | 'PG' | 'both' | null;
+  }) {
+    const now = new Date().toISOString();
+    if (data.id) {
+      await db.update(courses)
+        .set({
+          name: data.name,
+          category: data.category,
+          level: data.level ?? 'UG',
+        })
+        .where(eq(courses.id, data.id));
+      return { success: true, id: data.id };
+    } else {
+      const slugId = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `crs-${crypto.randomUUID().slice(0, 8)}`;
+      await db.insert(courses)
+        .values({
+          id: slugId,
+          name: data.name,
+          category: data.category,
+          level: data.level ?? 'UG',
+          createdAt: now,
+        });
+      return { success: true, id: slugId };
+    }
+  }
+
+  /**
+   * Deletes a course.
+   */
+  static async deleteCourse(adminUserId: string, courseId: string) {
+    const [existing] = await db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
+    if (!existing) throw new Error('Course not found');
+
+    await db.delete(courses).where(eq(courses.id, courseId));
+
+    await db.insert(auditLogs).values({
+      id: crypto.randomUUID(),
+      actorId: adminUserId,
+      action: 'delete_course',
+      detailsJson: JSON.stringify({ courseId, courseName: existing.name }),
+      createdAt: new Date().toISOString(),
+    });
+
+    return { success: true, id: courseId };
   }
 
   /**

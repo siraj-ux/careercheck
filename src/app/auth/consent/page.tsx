@@ -37,6 +37,10 @@ function ConsentContent() {
       .then((data) => {
         if (!data.success || !data.user) {
           router.replace(`/auth?redirect=${encodeURIComponent(redirectParam)}`);
+        } else if (data.user.role === 'admin') {
+          router.replace('/admin');
+        } else if (data.user.role === 'consultant') {
+          router.replace('/consultant');
         } else if (data.user.dob) {
           // User already completed DOB/Consent
           router.replace(redirectParam);

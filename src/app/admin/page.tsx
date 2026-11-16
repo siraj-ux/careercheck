@@ -13,6 +13,11 @@ import {
   AlertCircle,
   LogOut,
   Sparkles,
+  Pencil,
+  Trash2,
+  GraduationCap,
+  Search,
+  Plus,
 } from 'lucide-react';
 import { OfflineBanner } from '@/components/common/OfflineBanner';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
@@ -73,10 +78,21 @@ interface CollegeItem {
   name: string;
   city: string;
   state: string;
-  type: string;
-  annualFees: number;
-  cutoffPercent: number;
-  level: string;
+  type: string | null;
+  annualFees: number | null;
+  cutoffPercent: number | null;
+  examsJson: string | null;
+  coursesJson: string | null;
+  level: string | null;
+  createdAt: string;
+}
+
+interface CourseItem {
+  id: string;
+  name: string;
+  category: string;
+  level: string | null;
+  createdAt: string;
 }
 
 interface ConsultantItem {
@@ -106,7 +122,7 @@ export default function AdminConsolePage() {
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'questions' | 'colleges' | 'consultants' | 'audit'
+    'overview' | 'questions' | 'colleges' | 'courses' | 'consultants' | 'audit'
   >('overview');
 
   const [loading, setLoading] = useState(true);
@@ -125,15 +141,42 @@ export default function AdminConsolePage() {
 
   // Directory states
   const [collegesList, setCollegesList] = useState<CollegeItem[]>([]);
+  const [coursesList, setCoursesList] = useState<CourseItem[]>([]);
   const [consultantsList, setConsultantsList] = useState<ConsultantItem[]>([]);
   const [auditLogsList, setAuditLogsList] = useState<AuditItem[]>([]);
 
-  // Add College Modal / Form
-  const [showAddCollege, setShowAddCollege] = useState(false);
-  const [newCollegeName, setNewCollegeName] = useState('');
-  const [newCollegeCity, setNewCollegeCity] = useState('');
-  const [newCollegeCutoff, setNewCollegeCutoff] = useState('85');
-  const [newCollegeFees, setNewCollegeFees] = useState('200000');
+  // College editing states
+  const [editingCollege, setEditingCollege] = useState<CollegeItem | null>(null);
+  const [isAddingCollege, setIsAddingCollege] = useState(false);
+  const [collegeSearch, setCollegeSearch] = useState('');
+  const [collegeStateFilter, setCollegeStateFilter] = useState('all');
+  const [collegeStatusFilter, setCollegeStatusFilter] = useState<'all' | 'needs_fees' | 'needs_cutoff' | 'complete'>('all');
+  const [collegeForm, setCollegeForm] = useState({
+    name: '',
+    city: '',
+    state: '',
+    type: '',
+    annualFees: '',
+    cutoffPercent: '',
+    level: 'both' as 'UG' | 'PG' | 'both',
+    exams: '',
+    courses: [] as string[],
+  });
+  const [savingCollege, setSavingCollege] = useState(false);
+  const [selectedCourseToAdd, setSelectedCourseToAdd] = useState('');
+  const [customCourseToAdd, setCustomCourseToAdd] = useState('');
+
+  // Course editing states
+  const [editingCourse, setEditingCourse] = useState<CourseItem | null>(null);
+  const [isAddingCourse, setIsAddingCourse] = useState(false);
+  const [courseSearch, setCourseSearch] = useState('');
+  const [courseCategoryFilter, setCourseCategoryFilter] = useState('all');
+  const [courseForm, setCourseForm] = useState({
+    name: '',
+    category: 'MEDICAL',
+    level: 'UG' as 'UG' | 'PG' | 'both',
+  });
+  const [savingCourse, setSavingCourse] = useState(false);
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -163,7 +206,6 @@ export default function AdminConsolePage() {
         const assignJson = await assignRes.json();
         if (assignJson.success && !isCancelled) {
           setQueue(assignJson.queue || []);
-          // Initialize default selected consultants
           const initialMap: Record<string, string> = {};
           for (const item of assignJson.queue || []) {
             if (item.topSuggestion) {
@@ -183,12 +225,17 @@ export default function AdminConsolePage() {
         const colJson = await colRes.json();
         if (colJson.success && !isCancelled) setCollegesList(colJson.colleges || []);
 
-        // 5. Consultants
+        // 5. Courses
+        const crsRes = await fetch('/api/admin/courses');
+        const crsJson = await crsRes.json();
+        if (crsJson.success && !isCancelled) setCoursesList(crsJson.courses || []);
+
+        // 6. Consultants
         const consRes = await fetch('/api/admin/consultants');
         const consJson = await consRes.json();
         if (consJson.success && !isCancelled) setConsultantsList(consJson.consultants || []);
 
-        // 6. Audit Logs
+        // 7. Audit Logs
         const auditRes = await fetch('/api/admin/audit-logs');
         const auditJson = await auditRes.json();
         if (auditJson.success && !isCancelled) setAuditLogsList(auditJson.logs || []);
@@ -223,7 +270,6 @@ export default function AdminConsolePage() {
       });
       if (res.ok) {
         setQueue((prev) => prev.filter((item) => item.studentId !== studentId));
-        // Refresh funnel & consultants
         setRefreshTrigger((prev) => prev + 1);
       }
     } finally {
@@ -276,38 +322,217 @@ export default function AdminConsolePage() {
     }
   };
 
-  // Handle Add College
-  const handleAddCollege = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCollegeName.trim() || !newCollegeCity.trim()) return;
+  // Open Edit College Modal
+  const openEditCollege = (col: CollegeItem) => {
+    let examsList: string[] = [];
+    let coursesListParsed: string[] = [];
+    if (col.examsJson) {
+      try {
+        examsList = JSON.parse(col.examsJson);
+      } catch {
+        examsList = [];
+      }
+    }
+    if (col.coursesJson) {
+      try {
+        coursesListParsed = JSON.parse(col.coursesJson);
+      } catch {
+        coursesListParsed = [];
+      }
+    }
 
+    setEditingCollege(col);
+    setIsAddingCollege(false);
+    setSelectedCourseToAdd('');
+    setCustomCourseToAdd('');
+    setCollegeForm({
+      name: col.name,
+      city: col.city,
+      state: col.state || '',
+      type: col.type || '',
+      annualFees: col.annualFees != null ? String(col.annualFees) : '',
+      cutoffPercent: col.cutoffPercent != null ? String(col.cutoffPercent) : '',
+      level: (col.level as 'UG' | 'PG' | 'both') || 'both',
+      exams: examsList.join(', '),
+      courses: coursesListParsed,
+    });
+  };
+
+  const openAddCollege = () => {
+    setEditingCollege(null);
+    setIsAddingCollege(true);
+    setSelectedCourseToAdd('');
+    setCustomCourseToAdd('');
+    setCollegeForm({
+      name: '',
+      city: '',
+      state: '',
+      type: 'Private',
+      annualFees: '',
+      cutoffPercent: '',
+      level: 'both',
+      exams: '',
+      courses: [],
+    });
+  };
+
+  const handleSaveCollege = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!collegeForm.name.trim() || !collegeForm.city.trim()) return;
+
+    setSavingCollege(true);
     try {
+      const examsArray = collegeForm.exams
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const payload = {
+        id: editingCollege ? editingCollege.id : undefined,
+        name: collegeForm.name.trim(),
+        city: collegeForm.city.trim(),
+        state: collegeForm.state.trim() || 'India',
+        type: collegeForm.type.trim() || null,
+        annualFees: collegeForm.annualFees.trim() !== '' ? Number(collegeForm.annualFees) : null,
+        cutoffPercent: collegeForm.cutoffPercent.trim() !== '' ? Number(collegeForm.cutoffPercent) : null,
+        exams: examsArray,
+        courses: collegeForm.courses,
+        level: collegeForm.level,
+      };
+
       const res = await fetch('/api/admin/colleges', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newCollegeName.trim(),
-          city: newCollegeCity.trim(),
-          state: 'India',
-          type: 'Private',
-          annualFees: Number(newCollegeFees) || 200000,
-          cutoffPercent: Number(newCollegeCutoff) || 85,
-          exams: ['CUET'],
-          courses: ['Undergraduate Degree'],
-          level: 'both',
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
-        setShowAddCollege(false);
-        setNewCollegeName('');
-        setNewCollegeCity('');
+        setEditingCollege(null);
+        setIsAddingCollege(false);
         const colRes = await fetch('/api/admin/colleges');
         const colJson = await colRes.json();
         if (colJson.success) setCollegesList(colJson.colleges || []);
+      } else {
+        const errJson = await res.json();
+        alert(errJson.error || 'Failed to save college');
+      }
+    } finally {
+      setSavingCollege(false);
+    }
+  };
+
+  const handleDeleteCollege = async (collegeId: string, collegeName: string) => {
+    if (!confirm(`Are you sure you want to remove "${collegeName}" from the database?`)) return;
+
+    try {
+      const res = await fetch('/api/admin/colleges', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collegeId }),
+      });
+      if (res.ok) {
+        setCollegesList((prev) => prev.filter((c) => c.id !== collegeId));
+      } else {
+        const errJson = await res.json();
+        alert(errJson.error || 'Failed to delete college');
       }
     } catch {
-      // Ignore error
+      alert('Network error deleting college');
+    }
+  };
+
+  const handleAddCourseToCollege = (courseName: string) => {
+    const trimmed = courseName.trim();
+    if (!trimmed) return;
+    if (!collegeForm.courses.includes(trimmed)) {
+      setCollegeForm((prev) => ({
+        ...prev,
+        courses: [...prev.courses, trimmed],
+      }));
+    }
+    setSelectedCourseToAdd('');
+    setCustomCourseToAdd('');
+  };
+
+  const handleRemoveCourseFromCollege = (courseName: string) => {
+    setCollegeForm((prev) => ({
+      ...prev,
+      courses: prev.courses.filter((c) => c !== courseName),
+    }));
+  };
+
+  // Course handlers
+  const openEditCourse = (crs: CourseItem) => {
+    setEditingCourse(crs);
+    setIsAddingCourse(false);
+    setCourseForm({
+      name: crs.name,
+      category: crs.category,
+      level: (crs.level as 'UG' | 'PG' | 'both') || 'UG',
+    });
+  };
+
+  const openAddCourse = () => {
+    setEditingCourse(null);
+    setIsAddingCourse(true);
+    setCourseForm({
+      name: '',
+      category: 'MEDICAL',
+      level: 'UG',
+    });
+  };
+
+  const handleSaveCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!courseForm.name.trim() || !courseForm.category.trim()) return;
+
+    setSavingCourse(true);
+    try {
+      const payload = {
+        id: editingCourse ? editingCourse.id : undefined,
+        name: courseForm.name.trim(),
+        category: courseForm.category.trim().toUpperCase(),
+        level: courseForm.level,
+      };
+
+      const res = await fetch('/api/admin/courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setEditingCourse(null);
+        setIsAddingCourse(false);
+        const crsRes = await fetch('/api/admin/courses');
+        const crsJson = await crsRes.json();
+        if (crsJson.success) setCoursesList(crsJson.courses || []);
+      } else {
+        const errJson = await res.json();
+        alert(errJson.error || 'Failed to save course');
+      }
+    } finally {
+      setSavingCourse(false);
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string, courseName: string) => {
+    if (!confirm(`Are you sure you want to remove course "${courseName}"?`)) return;
+
+    try {
+      const res = await fetch('/api/admin/courses', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courseId }),
+      });
+      if (res.ok) {
+        setCoursesList((prev) => prev.filter((c) => c.id !== courseId));
+      } else {
+        const errJson = await res.json();
+        alert(errJson.error || 'Failed to delete course');
+      }
+    } catch {
+      alert('Network error deleting course');
     }
   };
 
@@ -352,6 +577,46 @@ export default function AdminConsolePage() {
     return q.section === questionSectionFilter;
   }) || [];
 
+  // Filtered Colleges
+  const availableCollegeStates = Array.from(new Set(collegesList.map((c) => c.state).filter(Boolean))).sort();
+  const filteredColleges = collegesList.filter((col) => {
+    if (collegeSearch) {
+      const q = collegeSearch.toLowerCase();
+      const matchName = col.name.toLowerCase().includes(q);
+      const matchCity = col.city.toLowerCase().includes(q);
+      const matchState = (col.state || '').toLowerCase().includes(q);
+      if (!matchName && !matchCity && !matchState) return false;
+    }
+    if (collegeStateFilter !== 'all' && col.state !== collegeStateFilter) {
+      return false;
+    }
+    if (collegeStatusFilter === 'needs_fees' && col.annualFees != null) {
+      return false;
+    }
+    if (collegeStatusFilter === 'needs_cutoff' && col.cutoffPercent != null) {
+      return false;
+    }
+    if (collegeStatusFilter === 'complete' && (col.annualFees == null || col.cutoffPercent == null)) {
+      return false;
+    }
+    return true;
+  });
+
+  // Filtered Courses
+  const availableCourseCategories = Array.from(new Set(coursesList.map((c) => c.category).filter(Boolean))).sort();
+  const filteredCourses = coursesList.filter((crs) => {
+    if (courseSearch) {
+      const q = courseSearch.toLowerCase();
+      if (!crs.name.toLowerCase().includes(q) && !crs.category.toLowerCase().includes(q)) {
+        return false;
+      }
+    }
+    if (courseCategoryFilter !== 'all' && crs.category !== courseCategoryFilter) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-zinc-50/80 pb-20">
       <OfflineBanner />
@@ -380,13 +645,14 @@ export default function AdminConsolePage() {
           </div>
         </div>
 
-        {/* Navigation Tabs (Variant 2i) */}
+        {/* Navigation Tabs */}
         <div className="border-t border-zinc-100 bg-white">
           <div className="mx-auto flex max-w-7xl gap-2 px-4 sm:px-6 overflow-x-auto py-2">
             {[
               { id: 'overview' as const, label: 'Funnel & Queue', icon: TrendingUp },
               { id: 'questions' as const, label: 'Question Bank', icon: HelpCircle },
-              { id: 'colleges' as const, label: 'Colleges', icon: Building },
+              { id: 'colleges' as const, label: `Colleges (${collegesList.length})`, icon: Building },
+              { id: 'courses' as const, label: `Courses (${coursesList.length})`, icon: GraduationCap },
               { id: 'consultants' as const, label: 'Consultants', icon: UserCheck },
               { id: 'audit' as const, label: 'Audit Trail', icon: ShieldAlert },
             ].map((tab) => {
@@ -418,375 +684,236 @@ export default function AdminConsolePage() {
            ======================================================== */}
         {activeTab === 'overview' && (
           <div className="space-y-8 animate-in fade-in">
-            {/* 1. Funnel Strip (Variant 2i) */}
+            {/* Funnel Metrics */}
             {funnel && (
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold text-zinc-950">Platform Conversion Funnel</h2>
-                  <span className="text-xs text-zinc-500 font-mono">Real-time metrics</span>
-                </div>
-
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xs space-y-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">1. Signups</span>
-                    <div className="text-2xl font-extrabold text-zinc-950">{funnel.signups}</div>
-                    <p className="text-[11px] text-zinc-500">Student accounts registered</p>
-                  </div>
-
-                  <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xs space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">2. Tests Done</span>
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                        {funnel.conversionRates.signupToTestPct}% conv
-                      </span>
-                    </div>
-                    <div className="text-2xl font-extrabold text-zinc-950">{funnel.testsCompleted}</div>
-                    <p className="text-[11px] text-zinc-500">Completed assessments</p>
-                  </div>
-
-                  <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xs space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold uppercase tracking-wider text-amber-600">3. Paid (Career Plan)</span>
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                        {funnel.conversionRates.testToPaidPct}% conv
-                      </span>
-                    </div>
-                    <div className="text-2xl font-extrabold text-zinc-950">{funnel.paid}</div>
-                    <p className="text-[11px] text-zinc-500">₹1,499 unlocked tier</p>
-                  </div>
-
-                  <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xs space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">4. Sessions Held</span>
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                        {funnel.conversionRates.paidToSessionPct}% conv
-                      </span>
-                    </div>
-                    <div className="text-2xl font-extrabold text-zinc-950">{funnel.sessionsCount}</div>
-                    <p className="text-[11px] text-zinc-500">1-on-1 consultations</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xs">
+                  <div className="text-zinc-500 text-xs font-semibold">Total Signups</div>
+                  <div className="mt-2 text-2xl font-bold text-zinc-950 font-mono">
+                    {funnel.signups.toLocaleString('en-IN')}
                   </div>
                 </div>
-              </section>
+
+                <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xs">
+                  <div className="text-zinc-500 text-xs font-semibold">Tests Completed</div>
+                  <div className="mt-2 text-2xl font-bold text-indigo-600 font-mono">
+                    {funnel.testsCompleted.toLocaleString('en-IN')}
+                  </div>
+                  <div className="mt-1 text-[11px] text-zinc-400">
+                    {funnel.conversionRates.signupToTestPct}% from signup
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xs">
+                  <div className="text-zinc-500 text-xs font-semibold">Paid Upgrades</div>
+                  <div className="mt-2 text-2xl font-bold text-emerald-600 font-mono">
+                    {funnel.paid.toLocaleString('en-IN')}
+                  </div>
+                  <div className="mt-1 text-[11px] text-zinc-400">
+                    {funnel.conversionRates.testToPaidPct}% conversion
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xs">
+                  <div className="text-zinc-500 text-xs font-semibold">1:1 Sessions Held</div>
+                  <div className="mt-2 text-2xl font-bold text-amber-600 font-mono">
+                    {funnel.sessionsCount.toLocaleString('en-IN')}
+                  </div>
+                  <div className="mt-1 text-[11px] text-zinc-400">
+                    {funnel.conversionRates.paidToSessionPct}% utilization
+                  </div>
+                </div>
+              </div>
             )}
 
-            {/* 2. Consultant Assignment Queue */}
-            <section className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xs space-y-5">
+            {/* Assignment Queue */}
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-zinc-950">Assignment Queue</h2>
-                    <span className="rounded-full bg-amber-500 text-white px-2.5 py-0.5 text-xs font-bold">
-                      {queue.length}
-                    </span>
-                  </div>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    Paid students awaiting human consultant assignment. Smart match algorithm suggests best fit.
+                  <h2 className="text-lg font-bold text-zinc-950">
+                    Student Mentor Assignment Queue ({queue.length})
+                  </h2>
+                  <p className="text-xs text-zinc-500">
+                    Paid students awaiting dedicated consultant assignment. Powered by 4-vector matching.
                   </p>
                 </div>
               </div>
 
               {queue.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-zinc-200 p-10 text-center text-xs text-zinc-500 space-y-1">
-                  <CheckCircle2 className="h-8 w-8 text-emerald-600 mx-auto" />
-                  <p className="font-bold text-zinc-800 text-sm">All Paid Students Assigned!</p>
-                  <p>There are no unassigned students in the queue at this time.</p>
+                <div className="rounded-3xl border border-dashed border-zinc-300 bg-white p-12 text-center">
+                  <CheckCircle2 className="h-8 w-8 text-emerald-600 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-zinc-700">No students waiting in assignment queue.</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">All paid students currently have mentors assigned.</p>
                 </div>
               ) : (
-                <div className="divide-y divide-zinc-100">
-                  {queue.map((item) => {
-                    const topMatch = item.topSuggestion;
-                    const selectedId = selectedConsultants[item.studentId] || topMatch?.consultantId;
-                    const isAssigning = assigningStudentId === item.studentId;
-
-                    return (
-                      <div
-                        key={item.studentId}
-                        className="py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-                      >
-                        {/* Student details */}
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-zinc-950">{item.name}</span>
-                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-600">
-                              {item.level}
-                            </span>
-                            <span className="text-xs text-zinc-400 font-mono">{item.phone}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {queue.map((item) => (
+                    <div
+                      key={item.studentId}
+                      className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xs flex flex-col justify-between space-y-4"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="text-sm font-bold text-zinc-950">{item.name}</h3>
+                            <p className="text-xs text-zinc-500 font-mono">{item.phone}</p>
                           </div>
-
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600">
-                            <span>Stream: <strong>{item.stream || 'General'}</strong></span>
-                            {item.preferredCities.length > 0 && (
-                              <span>· Cities: {item.preferredCities.slice(0, 2).join(', ')}</span>
-                            )}
-                            {item.interests.length > 0 && (
-                              <span>· Interests: {item.interests.slice(0, 2).join(', ')}</span>
-                            )}
-                          </div>
+                          <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 uppercase">
+                            {item.level}
+                          </span>
                         </div>
 
-                        {/* Match & Assignment Controls */}
-                        <div className="flex flex-wrap items-center gap-3">
-                          {topMatch && (
-                            <div className="flex items-center gap-2 rounded-2xl bg-indigo-50/80 border border-indigo-100 px-3.5 py-2 text-xs">
-                              <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                              <div>
-                                <span className="font-bold text-indigo-950">{topMatch.consultantName}</span>
-                                <span className="ml-1.5 font-bold font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                                  {topMatch.matchPercent}% Match
+                        {item.interests.length > 0 && (
+                          <div className="space-y-1">
+                            <span className="text-[10px] text-zinc-400 uppercase font-semibold">Interests</span>
+                            <div className="flex flex-wrap gap-1">
+                              {item.interests.slice(0, 3).map((int, i) => (
+                                <span
+                                  key={i}
+                                  className="rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-700 font-medium"
+                                >
+                                  {int}
                                 </span>
-                              </div>
+                              ))}
                             </div>
-                          )}
+                          </div>
+                        )}
 
-                          {/* Consultant Selector */}
+                        {item.topSuggestion && (
+                          <div className="rounded-2xl bg-indigo-50/60 border border-indigo-100 p-3 text-xs space-y-1">
+                            <div className="flex items-center justify-between text-indigo-900 font-semibold">
+                              <span className="flex items-center gap-1">
+                                <Sparkles className="h-3 w-3 text-indigo-600" />
+                                Smart Suggestion
+                              </span>
+                              <span className="font-mono text-indigo-700 font-bold">
+                                {item.topSuggestion.matchPercent}% Match
+                              </span>
+                            </div>
+                            <p className="text-zinc-700 text-xs font-bold">{item.topSuggestion.consultantName}</p>
+                            <p className="text-[11px] text-zinc-500">
+                              Active students: {item.topSuggestion.activeStudents} · Rating: {item.topSuggestion.rating} ★
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="space-y-1 pt-1">
+                          <label className="text-[10px] text-zinc-400 font-semibold uppercase">
+                            Assign Consultant
+                          </label>
                           <select
-                            value={selectedId}
+                            value={selectedConsultants[item.studentId] || ''}
                             onChange={(e) =>
-                              setSelectedConsultants({
-                                ...selectedConsultants,
+                              setSelectedConsultants((prev) => ({
+                                ...prev,
                                 [item.studentId]: e.target.value,
-                              })
+                              }))
                             }
-                            className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-800 focus:outline-hidden"
+                            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-800"
                           >
                             {item.allConsultantOptions.map((opt) => (
                               <option key={opt.consultantId} value={opt.consultantId}>
-                                {opt.consultantName} ({opt.matchPercent}%)
+                                {opt.consultantName} ({opt.matchPercent}% match)
                               </option>
                             ))}
                           </select>
-
-                          <button
-                            type="button"
-                            disabled={isAssigning}
-                            onClick={() => handleAssign(item.studentId)}
-                            className="rounded-full bg-indigo-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 transition-all"
-                          >
-                            {isAssigning ? 'Assigning...' : 'Assign'}
-                          </button>
                         </div>
                       </div>
-                    );
-                  })}
+
+                      <button
+                        type="button"
+                        onClick={() => handleAssign(item.studentId)}
+                        disabled={assigningStudentId === item.studentId}
+                        className="w-full rounded-full bg-indigo-600 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 transition-all"
+                      >
+                        {assigningStudentId === item.studentId ? 'Assigning...' : 'Confirm Assignment'}
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
-            </section>
+            </div>
           </div>
         )}
 
         {/* ========================================================
-            TAB 2: QUESTION BANK MANAGEMENT
+            TAB 2: QUESTION BANK
            ======================================================== */}
-        {activeTab === 'questions' && questionBank && (
+        {activeTab === 'questions' && (
           <div className="space-y-6 animate-in fade-in">
-            {/* Summary Strip */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {Object.entries(questionBank.summary).map(([sec, stats]) => (
-                <button
-                  key={sec}
-                  type="button"
-                  onClick={() => setQuestionSectionFilter(sec)}
-                  className={`rounded-2xl border p-4 text-left transition-all ${
-                    questionSectionFilter === sec
-                      ? 'border-indigo-600 bg-indigo-50/50 shadow-xs'
-                      : 'border-zinc-200 bg-white hover:bg-zinc-50'
-                  }`}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-zinc-950">Psychometric Question Bank</h2>
+                <p className="text-xs text-zinc-500">
+                  Manage questions across Interests, Aptitude, Personality, and Values.
+                </p>
+              </div>
+
+              {/* Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-500 font-semibold">Section:</span>
+                <select
+                  value={questionSectionFilter}
+                  onChange={(e) => setQuestionSectionFilter(e.target.value)}
+                  className="rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-800"
                 >
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                    {sec}
-                  </div>
-                  <div className="text-xl font-extrabold text-zinc-950 mt-1">{stats.total}</div>
-                  <div className="flex gap-2 text-[10px] text-zinc-500 mt-1">
-                    <span className="text-emerald-700 font-bold">{stats.live} live</span>
-                    <span>·</span>
-                    <span className="text-zinc-500">{stats.draft} draft</span>
-                  </div>
-                </button>
-              ))}
+                  <option value="all">All Sections ({questionBank?.questions?.length || 0})</option>
+                  <option value="interests">Interests (RIASEC)</option>
+                  <option value="aptitude">Aptitude</option>
+                  <option value="personality">Personality (Big 5)</option>
+                  <option value="values">Work Values</option>
+                  <option value="domain">PG Domain Knowledge</option>
+                </select>
+              </div>
             </div>
 
             {/* Questions Table */}
-            <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-zinc-950 capitalize">
-                    {questionSectionFilter === 'all' ? 'All Questions' : `${questionSectionFilter} Items`} ({filteredQuestions.length})
-                  </h3>
-                  <p className="text-xs text-zinc-500">Live questions appear in student tests. Draft items are withheld.</p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setQuestionSectionFilter('all')}
-                  className="text-xs font-semibold text-indigo-600 hover:underline"
-                >
-                  Show All Sections
-                </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-zinc-200 text-zinc-500 uppercase tracking-wider text-[10px]">
-                      <th className="py-2.5 px-3 font-bold">Section</th>
-                      <th className="py-2.5 px-3 font-bold">Question Stem</th>
-                      <th className="py-2.5 px-3 font-bold">Type</th>
-                      <th className="py-2.5 px-3 font-bold">Status</th>
-                      <th className="py-2.5 px-3 text-right font-bold">Toggle</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {filteredQuestions.slice(0, 50).map((q) => {
-                      const isLive = q.status === 'live';
-                      const isToggling = togglingQId === q.id;
-
-                      return (
-                        <tr key={q.id} className="hover:bg-zinc-50/60">
-                          <td className="py-2.5 px-3 capitalize font-bold text-zinc-700">
-                            {q.section}
-                          </td>
-                          <td className="py-2.5 px-3 text-zinc-900 max-w-md truncate">
-                            {q.stemText}
-                          </td>
-                          <td className="py-2.5 px-3 uppercase text-[10px] font-mono text-zinc-500">
-                            {q.type}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <span
-                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                                isLive ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-200 text-zinc-600'
-                              }`}
-                            >
-                              {q.status.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <button
-                              type="button"
-                              disabled={isToggling}
-                              onClick={() => handleToggleQuestion(q.id, q.status)}
-                              className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all ${
-                                isLive
-                                  ? 'border border-zinc-200 text-zinc-700 hover:bg-zinc-100'
-                                  : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                              }`}
-                            >
-                              {isLive ? 'Set to Draft' : 'Publish Live'}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================
-            TAB 3: COLLEGES DIRECTORY
-           ======================================================== */}
-        {activeTab === 'colleges' && (
-          <div className="space-y-6 animate-in fade-in">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-zinc-950">Colleges Directory ({collegesList.length})</h2>
-                <p className="text-xs text-zinc-500">Database of institutions for Safe, Target, and Reach report matching.</p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowAddCollege(true)}
-                className="rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700"
-              >
-                + Add College
-              </button>
-            </div>
-
-            {/* Add College Modal */}
-            {showAddCollege && (
-              <form onSubmit={handleAddCollege} className="rounded-3xl border border-indigo-200 bg-indigo-50/40 p-6 space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-sm font-bold text-zinc-950">Add Institution</h3>
-                  <button type="button" onClick={() => setShowAddCollege(false)} className="text-zinc-400">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    value={newCollegeName}
-                    onChange={(e) => setNewCollegeName(e.target.value)}
-                    placeholder="College Name"
-                    className="rounded-xl border border-zinc-200 bg-white p-2.5 text-xs"
-                    required
-                  />
-                  <input
-                    type="text"
-                    value={newCollegeCity}
-                    onChange={(e) => setNewCollegeCity(e.target.value)}
-                    placeholder="City (e.g. Mumbai, Bangalore)"
-                    className="rounded-xl border border-zinc-200 bg-white p-2.5 text-xs"
-                    required
-                  />
-                  <input
-                    type="number"
-                    value={newCollegeCutoff}
-                    onChange={(e) => setNewCollegeCutoff(e.target.value)}
-                    placeholder="Cutoff Percentage (e.g. 85)"
-                    className="rounded-xl border border-zinc-200 bg-white p-2.5 text-xs"
-                    required
-                  />
-                  <input
-                    type="number"
-                    value={newCollegeFees}
-                    onChange={(e) => setNewCollegeFees(e.target.value)}
-                    placeholder="Annual Fees in INR"
-                    className="rounded-xl border border-zinc-200 bg-white p-2.5 text-xs"
-                    required
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddCollege(false)}
-                    className="px-4 py-2 text-xs text-zinc-500"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-full bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-700"
-                  >
-                    Save College
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Colleges Table */}
             <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xs overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-zinc-200 text-zinc-500 uppercase tracking-wider text-[10px]">
-                    <th className="py-2.5 px-3 font-bold">College</th>
-                    <th className="py-2.5 px-3 font-bold">City</th>
+                    <th className="py-2.5 px-3 font-bold">Section</th>
+                    <th className="py-2.5 px-3 font-bold">Question Stem</th>
                     <th className="py-2.5 px-3 font-bold">Type</th>
-                    <th className="py-2.5 px-3 font-bold">Cutoff</th>
-                    <th className="py-2.5 px-3 font-bold">Annual Fees</th>
+                    <th className="py-2.5 px-3 font-bold">Level</th>
+                    <th className="py-2.5 px-3 font-bold">Status</th>
+                    <th className="py-2.5 px-3 font-bold text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {collegesList.map((col) => (
-                    <tr key={col.id} className="hover:bg-zinc-50/60">
-                      <td className="py-3 px-3 font-bold text-zinc-950">{col.name}</td>
-                      <td className="py-3 px-3 text-zinc-700">{col.city}</td>
-                      <td className="py-3 px-3 text-zinc-500">{col.type}</td>
-                      <td className="py-3 px-3 font-mono font-bold text-indigo-700">{col.cutoffPercent}%</td>
-                      <td className="py-3 px-3 font-mono">₹{col.annualFees.toLocaleString('en-IN')}</td>
+                  {filteredQuestions.map((q) => (
+                    <tr key={q.id} className="hover:bg-zinc-50/60">
+                      <td className="py-3 px-3 uppercase font-bold text-[10px] text-indigo-700">
+                        {q.section}
+                      </td>
+                      <td className="py-3 px-3 font-medium text-zinc-900 max-w-md">{q.stemText}</td>
+                      <td className="py-3 px-3 text-zinc-500">{q.type}</td>
+                      <td className="py-3 px-3">
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-600 uppercase">
+                          {q.level}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
+                            q.status === 'live'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-amber-50 text-amber-700'
+                          }`}
+                        >
+                          {q.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleQuestion(q.id, q.status)}
+                          disabled={togglingQId === q.id}
+                          className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+                        >
+                          {q.status === 'live' ? 'Move to Draft' : 'Publish Live'}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -796,7 +923,659 @@ export default function AdminConsolePage() {
         )}
 
         {/* ========================================================
-            TAB 4: CONSULTANTS DIRECTORY
+            TAB 3: COLLEGES DIRECTORY & EDITING
+           ======================================================== */}
+        {activeTab === 'colleges' && (
+          <div className="space-y-6 animate-in fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-zinc-950">
+                  Colleges Directory ({collegesList.length})
+                </h2>
+                <p className="text-xs text-zinc-500">
+                  Database of institutions. Annual fees and cutoffs can be updated anytime by admin.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={openAddCollege}
+                className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Institution
+              </button>
+            </div>
+
+            {/* Stats chips */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 font-semibold text-zinc-700">
+                Total: <strong className="text-zinc-950">{collegesList.length}</strong>
+              </span>
+              <span className="rounded-full border border-amber-200 bg-amber-50/70 px-3 py-1 font-semibold text-amber-800">
+                Pending Annual Fees:{' '}
+                <strong>{collegesList.filter((c) => c.annualFees == null).length}</strong>
+              </span>
+              <span className="rounded-full border border-sky-200 bg-sky-50/70 px-3 py-1 font-semibold text-sky-800">
+                Pending Cutoff:{' '}
+                <strong>{collegesList.filter((c) => c.cutoffPercent == null).length}</strong>
+              </span>
+              <span className="rounded-full border border-emerald-200 bg-emerald-50/70 px-3 py-1 font-semibold text-emerald-800">
+                Configured:{' '}
+                <strong>
+                  {collegesList.filter((c) => c.annualFees != null && c.cutoffPercent != null).length}
+                </strong>
+              </span>
+            </div>
+
+            {/* Search and Filters toolbar */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-zinc-400" />
+                <input
+                  type="text"
+                  value={collegeSearch}
+                  onChange={(e) => setCollegeSearch(e.target.value)}
+                  placeholder="Search colleges by name, city, or state..."
+                  className="w-full rounded-full border border-zinc-200 bg-white pl-10 pr-4 py-2 text-xs placeholder:text-zinc-400 focus:border-indigo-500 focus:outline-hidden"
+                />
+              </div>
+
+              <select
+                value={collegeStateFilter}
+                onChange={(e) => setCollegeStateFilter(e.target.value)}
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-800"
+              >
+                <option value="all">All States</option>
+                {availableCollegeStates.map((st) => (
+                  <option key={st} value={st}>
+                    {st}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={collegeStatusFilter}
+                onChange={(e) =>
+                  setCollegeStatusFilter(
+                    e.target.value as 'all' | 'needs_fees' | 'needs_cutoff' | 'complete'
+                  )
+                }
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-800"
+              >
+                <option value="all">All Records</option>
+                <option value="needs_fees">Needs Annual Fee</option>
+                <option value="needs_cutoff">Needs Cutoff %</option>
+                <option value="complete">Fully Configured</option>
+              </select>
+            </div>
+
+            {/* Colleges Table */}
+            <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xs overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-200 text-zinc-500 uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-3 font-bold">Institution</th>
+                    <th className="py-2.5 px-3 font-bold">Location</th>
+                    <th className="py-2.5 px-3 font-bold">Type</th>
+                    <th className="py-2.5 px-3 font-bold">Cutoff %</th>
+                    <th className="py-2.5 px-3 font-bold">Annual Fees</th>
+                    <th className="py-2.5 px-3 font-bold">Level</th>
+                    <th className="py-2.5 px-3 font-bold">Courses</th>
+                    <th className="py-2.5 px-3 font-bold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {filteredColleges.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-10 text-center text-zinc-400 text-xs">
+                        No colleges found matching search criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredColleges.map((col) => {
+                      let coursesCount = 0;
+                      if (col.coursesJson) {
+                        try {
+                          coursesCount = JSON.parse(col.coursesJson).length;
+                        } catch {
+                          coursesCount = 0;
+                        }
+                      }
+                      return (
+                        <tr key={col.id} className="hover:bg-zinc-50/60">
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-zinc-950">{col.name}</div>
+                            <div className="text-[10px] text-zinc-400 font-mono">{col.id}</div>
+                          </td>
+                          <td className="py-3 px-3 text-zinc-700">
+                            {col.city}, {col.state || 'India'}
+                          </td>
+                          <td className="py-3 px-3">
+                            {col.type ? (
+                              <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-700">
+                                {col.type}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-400 italic text-[11px]">Not set</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            {col.cutoffPercent != null ? (
+                              <span className="font-mono font-bold text-indigo-700">
+                                {col.cutoffPercent}%
+                              </span>
+                            ) : (
+                              <span className="text-amber-600/90 bg-amber-50 px-2 py-0.5 rounded text-[10px] font-semibold">
+                                Pending
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 font-mono">
+                            {col.annualFees != null ? (
+                              <span className="font-bold text-zinc-900">
+                                ₹{col.annualFees.toLocaleString('en-IN')}
+                              </span>
+                            ) : (
+                              <span className="text-amber-600/90 bg-amber-50 px-2 py-0.5 rounded text-[10px] font-semibold font-sans">
+                                Pending
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-600 uppercase">
+                              {col.level || 'both'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                              {coursesCount} courses
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openEditCollege(col)}
+                                className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50/70 px-3 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                              >
+                                <Pencil className="h-3 w-3" />
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCollege(col.id, col.name)}
+                                className="p-1 rounded-full text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                title="Remove college"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Edit / Add College Modal Dialog */}
+            {(editingCollege || isAddingCollege) && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
+                <div className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-6 sm:p-7 shadow-xl space-y-5 my-8 max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-start justify-between border-b border-zinc-100 pb-3">
+                    <div>
+                      <h3 className="text-base font-bold text-zinc-950">
+                        {editingCollege ? `Edit: ${editingCollege.name}` : 'Add New Institution'}
+                      </h3>
+                      <p className="text-xs text-zinc-500">
+                        {editingCollege
+                          ? `ID: ${editingCollege.id} · Update fees, cutoff, exams & courses`
+                          : 'Fill institution details for the database'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCollege(null);
+                        setIsAddingCollege(false);
+                      }}
+                      className="text-zinc-400 hover:text-zinc-600 p-1"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSaveCollege} className="space-y-4">
+                    {/* Name */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-zinc-800">College Name *</label>
+                      <input
+                        type="text"
+                        value={collegeForm.name}
+                        onChange={(e) => setCollegeForm({ ...collegeForm, name: e.target.value })}
+                        placeholder="e.g. Acharya Group of Institutions"
+                        className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-900 focus:border-indigo-500 focus:outline-hidden"
+                        required
+                      />
+                    </div>
+
+                    {/* City & State */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-zinc-800">City *</label>
+                        <input
+                          type="text"
+                          value={collegeForm.city}
+                          onChange={(e) => setCollegeForm({ ...collegeForm, city: e.target.value })}
+                          placeholder="e.g. Bangalore, Kochi, Ernakulam"
+                          className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-900 focus:border-indigo-500 focus:outline-hidden"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-zinc-800">State</label>
+                        <input
+                          type="text"
+                          value={collegeForm.state}
+                          onChange={(e) => setCollegeForm({ ...collegeForm, state: e.target.value })}
+                          placeholder="e.g. Karnataka, Kerala, Tamil Nadu"
+                          className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-900 focus:border-indigo-500 focus:outline-hidden"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Type & Level */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-zinc-800">Institution Type</label>
+                        <input
+                          type="text"
+                          value={collegeForm.type}
+                          onChange={(e) => setCollegeForm({ ...collegeForm, type: e.target.value })}
+                          placeholder="e.g. Private, Government, Deemed, Autonomous"
+                          className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-900 focus:border-indigo-500 focus:outline-hidden"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-zinc-800">Academic Level</label>
+                        <select
+                          value={collegeForm.level}
+                          onChange={(e) =>
+                            setCollegeForm({
+                              ...collegeForm,
+                              level: e.target.value as 'UG' | 'PG' | 'both',
+                            })
+                          }
+                          className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-900 focus:border-indigo-500 focus:outline-hidden"
+                        >
+                          <option value="UG">UG (Undergraduate Only)</option>
+                          <option value="PG">PG (Postgraduate Only)</option>
+                          <option value="both">Both UG & PG</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Annual Fees & Cutoff Percent */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-zinc-800">Annual Fees (₹ INR)</label>
+                        <input
+                          type="number"
+                          value={collegeForm.annualFees}
+                          onChange={(e) =>
+                            setCollegeForm({ ...collegeForm, annualFees: e.target.value })
+                          }
+                          placeholder="Leave empty if not yet known"
+                          className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-900 focus:border-indigo-500 focus:outline-hidden"
+                        />
+                        <p className="text-[10px] text-zinc-400">
+                          Leave blank if fees should be updated later by admin.
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-zinc-800">Admission Cutoff (%)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          value={collegeForm.cutoffPercent}
+                          onChange={(e) =>
+                            setCollegeForm({ ...collegeForm, cutoffPercent: e.target.value })
+                          }
+                          placeholder="Leave empty if not yet known"
+                          className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-900 focus:border-indigo-500 focus:outline-hidden"
+                        />
+                        <p className="text-[10px] text-zinc-400">
+                          Percentage required for eligibility (0-100).
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Exams */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-zinc-800">Accepted Entrance Exams</label>
+                      <input
+                        type="text"
+                        value={collegeForm.exams}
+                        onChange={(e) => setCollegeForm({ ...collegeForm, exams: e.target.value })}
+                        placeholder="e.g. NEET, KEAM, JEE Main, CUET (comma separated)"
+                        className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-900 focus:border-indigo-500 focus:outline-hidden"
+                      />
+                    </div>
+
+                    {/* Courses Offered */}
+                    <div className="space-y-2 border-t border-zinc-100 pt-3">
+                      <label className="text-xs font-bold text-zinc-800">
+                        Courses Offered ({collegeForm.courses.length})
+                      </label>
+
+                      {/* Selected Courses Chips */}
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 bg-zinc-50 rounded-xl border border-zinc-100">
+                        {collegeForm.courses.length === 0 ? (
+                          <span className="text-[11px] text-zinc-400 italic">
+                            No courses mapped to this college yet. Pick from below or type custom.
+                          </span>
+                        ) : (
+                          collegeForm.courses.map((crsName) => (
+                            <span
+                              key={crsName}
+                              className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-800"
+                            >
+                              <span>{crsName}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCourseFromCollege(crsName)}
+                                className="text-indigo-400 hover:text-indigo-700 ml-0.5"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Quick course selector from database */}
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        <select
+                          value={selectedCourseToAdd}
+                          onChange={(e) => {
+                            setSelectedCourseToAdd(e.target.value);
+                            if (e.target.value) handleAddCourseToCollege(e.target.value);
+                          }}
+                          className="flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-800"
+                        >
+                          <option value="">+ Select from {coursesList.length} database courses...</option>
+                          {coursesList.map((c) => (
+                            <option key={c.id} value={c.name}>
+                              [{c.category}] {c.name}
+                            </option>
+                          ))}
+                        </select>
+
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={customCourseToAdd}
+                            onChange={(e) => setCustomCourseToAdd(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddCourseToCollege(customCourseToAdd);
+                              }
+                            }}
+                            placeholder="Or type custom course..."
+                            className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAddCourseToCollege(customCourseToAdd)}
+                            className="rounded-xl border border-zinc-300 bg-zinc-100 px-3 py-1.5 text-xs font-bold text-zinc-700 hover:bg-zinc-200"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2.5 pt-4 border-t border-zinc-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCollege(null);
+                          setIsAddingCollege(false);
+                        }}
+                        className="rounded-full border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={savingCollege}
+                        className="rounded-full bg-indigo-600 px-6 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        {savingCollege ? 'Saving...' : editingCollege ? 'Save Changes' : 'Create College'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================
+            TAB 4: COURSES DIRECTORY & EDITING
+           ======================================================== */}
+        {activeTab === 'courses' && (
+          <div className="space-y-6 animate-in fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-zinc-950">
+                  Courses Directory ({coursesList.length})
+                </h2>
+                <p className="text-xs text-zinc-500">
+                  Programs available in the system extracted from academic catalog.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={openAddCourse}
+                className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Course
+              </button>
+            </div>
+
+            {/* Search and Category Filter */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-zinc-400" />
+                <input
+                  type="text"
+                  value={courseSearch}
+                  onChange={(e) => setCourseSearch(e.target.value)}
+                  placeholder="Search courses by name or category..."
+                  className="w-full rounded-full border border-zinc-200 bg-white pl-10 pr-4 py-2 text-xs placeholder:text-zinc-400 focus:border-indigo-500 focus:outline-hidden"
+                />
+              </div>
+
+              <select
+                value={courseCategoryFilter}
+                onChange={(e) => setCourseCategoryFilter(e.target.value)}
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-800"
+              >
+                <option value="all">All Categories ({coursesList.length})</option>
+                {availableCourseCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat} ({coursesList.filter((c) => c.category === cat).length})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Courses Table */}
+            <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-xs overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-200 text-zinc-500 uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-3 font-bold">Course Title</th>
+                    <th className="py-2.5 px-3 font-bold">Category</th>
+                    <th className="py-2.5 px-3 font-bold">Level</th>
+                    <th className="py-2.5 px-3 font-bold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {filteredCourses.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-10 text-center text-zinc-400 text-xs">
+                        No courses found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredCourses.map((crs) => (
+                      <tr key={crs.id} className="hover:bg-zinc-50/60">
+                        <td className="py-3 px-3">
+                          <div className="font-bold text-zinc-950">{crs.name}</div>
+                          <div className="text-[10px] text-zinc-400 font-mono">{crs.id}</div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                            {crs.category}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-600 uppercase">
+                            {crs.level || 'UG'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openEditCourse(crs)}
+                              className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50/70 px-3 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCourse(crs.id, crs.name)}
+                              className="p-1 rounded-full text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              title="Remove course"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Edit / Add Course Modal Dialog */}
+            {(editingCourse || isAddingCourse) && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
+                <div className="w-full max-w-lg rounded-3xl border border-zinc-200 bg-white p-6 sm:p-7 shadow-xl space-y-5">
+                  <div className="flex items-start justify-between border-b border-zinc-100 pb-3">
+                    <div>
+                      <h3 className="text-base font-bold text-zinc-950">
+                        {editingCourse ? `Edit: ${editingCourse.name}` : 'Add New Course'}
+                      </h3>
+                      <p className="text-xs text-zinc-500">
+                        {editingCourse ? `ID: ${editingCourse.id}` : 'Create a course record'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCourse(null);
+                        setIsAddingCourse(false);
+                      }}
+                      className="text-zinc-400 hover:text-zinc-600 p-1"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSaveCourse} className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-zinc-800">Course Name *</label>
+                      <input
+                        type="text"
+                        value={courseForm.name}
+                        onChange={(e) => setCourseForm({ ...courseForm, name: e.target.value })}
+                        placeholder="e.g. B.Tech in Artificial Intelligence"
+                        className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-900 focus:border-indigo-500 focus:outline-hidden"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-zinc-800">Category *</label>
+                      <input
+                        type="text"
+                        value={courseForm.category}
+                        onChange={(e) => setCourseForm({ ...courseForm, category: e.target.value })}
+                        placeholder="e.g. MEDICAL, ENGINEERING, BCA, BBA, BCOM"
+                        className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-900 focus:border-indigo-500 focus:outline-hidden"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-zinc-800">Academic Level</label>
+                      <select
+                        value={courseForm.level}
+                        onChange={(e) =>
+                          setCourseForm({
+                            ...courseForm,
+                            level: e.target.value as 'UG' | 'PG' | 'both',
+                          })
+                        }
+                        className="w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-900 focus:border-indigo-500 focus:outline-hidden"
+                      >
+                        <option value="UG">UG (Undergraduate)</option>
+                        <option value="PG">PG (Postgraduate)</option>
+                        <option value="both">Both UG & PG</option>
+                      </select>
+                    </div>
+
+                    <div className="flex justify-end gap-2.5 pt-4 border-t border-zinc-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCourse(null);
+                          setIsAddingCourse(false);
+                        }}
+                        className="rounded-full border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={savingCourse}
+                        className="rounded-full bg-indigo-600 px-6 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        {savingCourse ? 'Saving...' : editingCourse ? 'Save Changes' : 'Create Course'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================
+            TAB 5: CONSULTANTS DIRECTORY
            ======================================================== */}
         {activeTab === 'consultants' && (
           <div className="space-y-6 animate-in fade-in">
@@ -863,7 +1642,7 @@ export default function AdminConsolePage() {
         )}
 
         {/* ========================================================
-            TAB 5: AUDIT TRAIL
+            TAB 6: AUDIT TRAIL
            ======================================================== */}
         {activeTab === 'audit' && (
           <div className="space-y-6 animate-in fade-in">

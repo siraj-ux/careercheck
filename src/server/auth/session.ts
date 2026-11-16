@@ -180,6 +180,7 @@ export async function verifyOtpAndLogin(
   user?: SessionUser;
   isNewUser?: boolean;
   requiresConsent?: boolean;
+  redirectUrl?: string;
 }> {
   const nowIso = new Date().toISOString();
   const inputHash = hashToken(code);
@@ -262,12 +263,25 @@ export async function verifyOtpAndLogin(
 
   await createSession(existingUser.id, 'mobile-web');
 
-  const requiresConsent = !existingUser.dob;
+  // Only students undergo DPDP Act parental consent / DOB requirement
+  const requiresConsent = existingUser.role === 'student' && !existingUser.dob;
+
+  let redirectUrl = '/dashboard';
+  if (existingUser.role === 'admin') {
+    redirectUrl = '/admin';
+  } else if (existingUser.role === 'consultant') {
+    redirectUrl = '/consultant';
+  } else if (requiresConsent) {
+    redirectUrl = '/auth/consent';
+  } else if (isNewUser) {
+    redirectUrl = '/onboarding/profile';
+  }
 
   return {
     success: true,
     isNewUser,
     requiresConsent,
+    redirectUrl,
     user: {
       id: existingUser.id,
       phone: existingUser.phone,

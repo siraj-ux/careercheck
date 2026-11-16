@@ -16,6 +16,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Role-based redirect: Never return student dashboard payload to admin or consultant
+    if (user.role === 'admin') {
+      return NextResponse.json({ success: true, redirect: '/admin' });
+    }
+    if (user.role === 'consultant') {
+      return NextResponse.json({ success: true, redirect: '/consultant' });
+    }
+
     const now = new Date();
 
     // 1. Fetch user's assessment result existence

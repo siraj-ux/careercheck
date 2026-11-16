@@ -116,6 +116,14 @@ function ProfileIntakeContent() {
           router.replace('/auth?redirect=/onboarding/profile');
           return;
         }
+        if (data.user.role === 'admin') {
+          router.replace('/admin');
+          return;
+        }
+        if (data.user.role === 'consultant') {
+          router.replace('/consultant');
+          return;
+        }
         if (!data.user.dob) {
           router.replace('/auth/consent?redirect=/onboarding/profile');
           return;

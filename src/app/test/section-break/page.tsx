@@ -39,6 +39,14 @@ function SectionBreakContent() {
           router.replace(`/auth?redirect=${encodeURIComponent(`/test/section-break?sessionId=${sessionId}&section=${finishedSection}`)}`);
           return;
         }
+        if (data.user.role === 'admin') {
+          router.replace('/admin');
+          return;
+        }
+        if (data.user.role === 'consultant') {
+          router.replace('/consultant');
+          return;
+        }
         if (!data.user.dob) {
           router.replace(`/auth/consent?redirect=${encodeURIComponent(`/test/section-break?sessionId=${sessionId}&section=${finishedSection}`)}`);
           return;

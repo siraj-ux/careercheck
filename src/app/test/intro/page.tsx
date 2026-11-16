@@ -29,6 +29,14 @@ function TestIntroContent() {
           router.replace('/auth?redirect=/test/intro');
           return;
         }
+        if (data.user.role === 'admin') {
+          router.replace('/admin');
+          return;
+        }
+        if (data.user.role === 'consultant') {
+          router.replace('/consultant');
+          return;
+        }
         if (!data.user.dob) {
           router.replace('/auth/consent?redirect=/test/intro');
           return;
@@ -77,8 +85,8 @@ function TestIntroContent() {
   const sectionsUG = [
     {
       num: 1,
-      title: 'Interests (RIASEC)',
-      desc: 'Discover your authentic vocational passions across 6 global dimensions.',
+      title: 'Interests & Activities',
+      desc: 'Discover what kind of tasks, hobbies, and activities you naturally enjoy doing.',
       timing: '~10 min',
       isTimed: false,
       items: '60 questions',
